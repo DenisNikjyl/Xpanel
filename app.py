@@ -89,8 +89,9 @@ def login():
 @app.route('/api/servers', methods=['GET'])
 @jwt_required()
 def get_servers():
-    """Get list of all servers"""
-    return jsonify(server_manager.get_all_servers())
+    """Get all servers with their status"""
+    servers = server_manager.get_all_servers()
+    return jsonify({'servers': servers})
 
 @app.route('/api/servers', methods=['POST'])
 @jwt_required()
@@ -114,7 +115,21 @@ def get_server_stats(server_id):
     stats = server_manager.get_server_stats(server_id)
     return jsonify(stats)
 
-@app.route('/api/servers/<server_id>/execute', methods=['POST'])
+@app.route('/api/servers/<server_id>/install-agent', methods=['POST'])
+@jwt_required()
+def install_agent(server_id):
+    """Install agent on server"""
+    data = request.get_json()
+    result = server_manager.install_agent_remote(
+        host=data.get('host'),
+        port=data.get('port', 22),
+        username=data.get('username'),
+        password=data.get('password'),
+        key_file=data.get('key_file')
+    )
+    return jsonify(result)
+
+@app.route('/api/servers/<server_id>/command', methods=['POST'])
 @jwt_required()
 def execute_command(server_id):
     """Execute command on server"""
@@ -122,13 +137,6 @@ def execute_command(server_id):
     command = data.get('command')
     result = server_manager.execute_command(server_id, command)
     return jsonify(result)
-
-@app.route('/api/servers', methods=['GET'])
-@jwt_required()
-def get_servers():
-    """Get all servers with their status"""
-    servers = server_manager.get_all_servers()
-    return jsonify({'servers': servers})
 
 @app.route('/api/servers/<server_id>', methods=['DELETE'])
 @jwt_required()
