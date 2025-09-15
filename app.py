@@ -52,6 +52,14 @@ def index_ru():
 def dashboard():
     return render_template('dashboard_v2.html')
 
+@app.route('/dashboard/ultra')
+def dashboard_ultra():
+    return render_template('dashboard_ultra.html')
+
+@app.route('/dashboard/modern')
+def dashboard_modern():
+    return render_template('dashboard_modern.html')
+
 @app.route('/login')
 def login_page():
     return render_template('login_new.html')
@@ -243,6 +251,41 @@ def agent_register():
     agent_client.register_agent(data['server_id'], data)
     
     return jsonify({'success': True, 'message': 'Agent registered successfully'})
+
+@app.route('/api/stats', methods=['GET'])
+@jwt_required()
+def get_dashboard_stats():
+    """Get dashboard statistics"""
+    try:
+        servers = server_manager.get_all_servers()
+        total_servers = len(servers)
+        active_servers = len([s for s in servers if s.get('status') == 'online'])
+        
+        # Calculate average CPU and memory usage
+        total_cpu = 0
+        total_memory = 0
+        server_count = 0
+        
+        for server in servers:
+            if server.get('cpu_usage') is not None:
+                total_cpu += server.get('cpu_usage', 0)
+                server_count += 1
+            if server.get('memory_usage') is not None:
+                total_memory += server.get('memory_usage', 0)
+        
+        avg_cpu = round(total_cpu / server_count) if server_count > 0 else 0
+        avg_memory = round(total_memory / server_count) if server_count > 0 else 0
+        
+        return jsonify({
+            'total_servers': total_servers,
+            'active_servers': active_servers,
+            'avg_cpu': avg_cpu,
+            'avg_memory': avg_memory,
+            'cpu_trend': 'neutral',
+            'memory_trend': 'neutral'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/system/stats', methods=['GET'])
 @jwt_required()

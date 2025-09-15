@@ -3,150 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xpanel - Современная панель управления</title>
-    <link rel="stylesheet" href="/static/css/dashboard_modern.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Xpanel - Панель управления</title>
+    <link rel="stylesheet" href="/static/css/dashboard_ultra.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="dashboard">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-server"></i>
-                <span>Xpanel</span>
+    <div class="app">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-cube"></i>
+                    </div>
+                    <span class="logo-text">Xpanel</span>
+                </div>
             </div>
             
-            <nav class="nav-menu">
-                <a href="#dashboard" class="nav-item active" data-section="dashboard">
-                    <i class="fas fa-tachometer-alt"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="#servers" class="nav-item" data-section="servers">
-                    <i class="fas fa-server"></i>
-                    <span>Серверы</span>
-                </a>
-                <a href="#terminal" class="nav-item" data-section="terminal">
-                    <i class="fas fa-terminal"></i>
-                    <span>Терминал</span>
-                </a>
-                <a href="#files" class="nav-item" data-section="files">
-                    <i class="fas fa-folder"></i>
-                    <span>Файлы</span>
-                </a>
-                <a href="#monitoring" class="nav-item" data-section="monitoring">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Мониторинг</span>
-                </a>
-                <a href="#settings" class="nav-item" data-section="settings">
-                    <i class="fas fa-cog"></i>
-                    <span>Настройки</span>
-                </a>
-            </nav>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Top Navigation Bar -->
-            <header class="navbar">
-                <div class="nav-left">
-                    <button class="sidebar-toggle">
-                        <i class="fas fa-bars"></i>
+            <div class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-item active" data-page="dashboard">
+                        <div class="nav-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span class="nav-text">Главная</span>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item" data-page="servers">
+                        <div class="nav-icon">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <span class="nav-text">Серверы</span>
+                        <div class="nav-badge" id="servers-count">0</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item" data-page="monitoring">
+                        <div class="nav-icon">
+                            <i class="fas fa-chart-area"></i>
+                        </div>
+                        <span class="nav-text">Мониторинг</span>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item" data-page="terminal">
+                        <div class="nav-icon">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <span class="nav-text">Терминал</span>
+                        <div class="nav-indicator"></div>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-item" data-page="settings">
+                        <div class="nav-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <span class="nav-text">Настройки</span>
+                        <div class="nav-indicator"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-status">Онлайн</div>
+                    </div>
+                    <button class="logout-btn" onclick="dashboard.logout()">
+                        <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
-                
-                <div class="nav-center">
-                    <div class="search-bar">
-                        <i class="fas fa-search"></i>
-                        <input type="text" placeholder="Поиск серверов, команд...">
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1 class="page-title">
+                            <span class="title-icon">
+                                <i class="fas fa-home"></i>
+                            </span>
+                            Dashboard
+                        </h1>
+                        <p class="page-description">Управление вашими серверами</p>
                     </div>
-                </div>
-                
-                <div class="nav-right">
-                    <div class="theme-switcher">
-                        <i class="fas fa-moon"></i>
-                    </div>
-                    <div class="notifications">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
-                    </div>
-                    <div class="user-menu">
-                        <div class="user-avatar">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <div class="user-info">
-                            <span class="username" id="current-user">Admin</span>
-                            <span class="user-role">Администратор</span>
-                        </div>
-                        <div class="user-dropdown">
-                            <a href="#profile"><i class="fas fa-user-circle"></i> Профиль</a>
-                            <a href="#settings"><i class="fas fa-cog"></i> Настройки</a>
-                            <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выход</a>
+                    
+                    <div class="header-right">
+                        <div class="header-actions">
+                            <button class="action-btn" onclick="dashboard.refreshDashboard()" title="Обновить">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            
+                            <button class="action-btn" title="Уведомления">
+                                <i class="fas fa-bell"></i>
+                                <span class="notification-badge">3</span>
+                            </button>
+                            
+                            <button class="btn-primary" onclick="dashboard.showAddServerModal()">
+                                <i class="fas fa-plus"></i>
+                                <span>Добавить сервер</span>
+                            </button>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <!-- Dashboard Section -->
-            <section id="dashboard-section" class="content-section active">
-                <div class="section-header">
-                    <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
-                    <div class="header-actions">
-                        <button class="btn btn-secondary" onclick="refreshDashboard()">
-                            <i class="fas fa-sync-alt"></i>
-                            Обновить
-                        </button>
-                        <button class="btn btn-primary" onclick="showAddServerModal()">
-                            <i class="fas fa-plus"></i>
-                            Добавить сервер
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Welcome Card -->
-                <div class="welcome-card">
-                    <div class="welcome-content">
-                        <h3>Добро пожаловать в Xpanel</h3>
-                        <p>Современная панель управления серверами с мощными возможностями мониторинга</p>
-                    </div>
-                    <div class="welcome-stats">
-                        <div class="stat-item">
-                            <span class="stat-number" id="total-servers">0</span>
-                            <span class="stat-label">Серверов</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number" id="online-servers">0</span>
-                            <span class="stat-label">Онлайн</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- System Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card cpu">
-                        <div class="stat-header">
-                            <div class="stat-info">
-                                <h3>Процессор</h3>
-                                <div class="stat-value" id="cpu-usage">0%</div>
-                                <div class="stat-label">Загрузка CPU</div>
+            <!-- Content -->
+            <div class="content">
+                <!-- Stats Overview -->
+                <section class="stats-section">
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                                <div class="stat-trend up">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+2</span>
+                                </div>
                             </div>
-                            <div class="stat-icon cpu">
-                                <i class="fas fa-microchip"></i>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-servers">0</div>
+                                <div class="stat-label">Всего серверов</div>
                             </div>
-                        </div>
-                        <div class="stat-progress">
-                            <div class="stat-progress-bar cpu" id="cpu-progress" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card memory">
-                        <div class="stat-header">
-                            <div class="stat-info">
-                                <h3>Память</h3>
-                                <div class="stat-value" id="memory-usage">0%</div>
-                                <div class="stat-label">Использование RAM</div>
+                            <div class="stat-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 75%"></div>
+                                </div>
                             </div>
-                            <div class="stat-icon memory">
                                 <i class="fas fa-memory"></i>
                             </div>
                         </div>

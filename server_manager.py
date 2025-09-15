@@ -540,20 +540,16 @@ fi
 # Detect package manager and install dependencies
 print_status "Installing dependencies..."
 if command -v apt-get &> /dev/null; then
-    apt-get update
-    apt-get install -y python3 python3-pip curl
+    apt-get update -qq
+    apt-get install -y python3 python3-pip python3-venv curl wget
 elif command -v yum &> /dev/null; then
-    yum install -y python3 python3-pip curl
+    yum install -y python3 python3-pip curl wget
 elif command -v dnf &> /dev/null; then
-    dnf install -y python3 python3-pip curl
+    dnf install -y python3 python3-pip curl wget
 else
     print_error "Unsupported package manager"
     exit 1
 fi
-
-# Install Python packages
-print_status "Installing Python packages..."
-pip3 install psutil requests
 
 # Create agent user
 print_status "Creating agent user..."
@@ -564,62 +560,255 @@ fi
 # Create agent directory
 print_status "Creating agent directory..."
 mkdir -p "$AGENT_DIR"
-chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR"
+cd "$AGENT_DIR"
 
-# Create agent script
-print_status "Creating agent script..."
-cat > "$AGENT_DIR/xpanel_agent.py" << 'AGENT_EOF'
-{agent_script}
-AGENT_EOF
+# Download agent script
+print_status "Downloading agent..."
+cat > xpanel_agent.py << 'AGENT_SCRIPT_EOF'
+#!/usr/bin/env python3
+import os
+import sys
+import time
+import json
+import psutil
+import socket
+import requests
+import subprocess
+import threading
+from datetime import datetime
+import logging
 
-chmod +x "$AGENT_DIR/xpanel_agent.py"
-chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/xpanel_agent.py"
+class XpanelAgent:
+    def __init__(self, panel_address="{panel_address}", panel_port=5000, server_id=None):
+        self.panel_address = panel_address
+        self.panel_port = panel_port
+        self.server_id = server_id or self.generate_server_id()
+        self.running = False
+        self.heartbeat_interval = 30
+        
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('/var/log/xpanel-agent.log'),
+                logging.StreamHandler()
+            ]
+        )
+        self.logger = logging.getLogger(__name__)
+        
+    def generate_server_id(self):
+        hostname = socket.gethostname()
+        try:
+            import uuid
+            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
+                           for elements in range(0,2*6,2)][::-1])
+            return f"{{hostname}}-{{mac}}"
+        except:
+            return hostname
+    
+    def get_system_stats(self):
+        try:
+            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_count = psutil.cpu_count()
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            network = psutil.net_io_counters()
+            load_avg = os.getloadavg() if hasattr(os, 'getloadavg') else [0, 0, 0]
+            boot_time = psutil.boot_time()
+            uptime = time.time() - boot_time
+            
+            stats = {{
+                'server_id': self.server_id,
+                'timestamp': datetime.now().isoformat(),
+                'cpu': {{
+                    'usage': cpu_percent,
+                    'cores': cpu_count
+                }},
+                'memory': {{
+                    'total': memory.total,
+                    'available': memory.available,
+                    'used': memory.used,
+                    'percent': memory.percent
+                }},
+                'disk': {{
+                    'total': disk.total,
+                    'used': disk.used,
+                    'free': disk.free,
+                    'percent': (disk.used / disk.total) * 100
+                }},
+                'network': {{
+                    'bytes_sent': network.bytes_sent,
+                    'bytes_recv': network.bytes_recv,
+                    'packets_sent': network.packets_sent,
+                    'packets_recv': network.packets_recv
+                }},
+                'load_average': load_avg,
+                'uptime': uptime
+            }}
+            
+            return stats
+        except Exception as e:
+            self.logger.error(f"Error collecting system stats: {{e}}")
+            return None
+    
+    def send_heartbeat(self):
+        try:
+            stats = self.get_system_stats()
+            if not stats:
+                return False
+                
+            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/heartbeat"
+            response = requests.post(
+                url,
+                json=stats,
+                timeout=10,
+                headers={{'Content-Type': 'application/json'}}
+            )
+            
+            if response.status_code == 200:
+                self.logger.debug("Heartbeat sent successfully")
+                return True
+            else:
+                self.logger.warning(f"Heartbeat failed: {{response.status_code}}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error sending heartbeat: {{e}}")
+            return False
+    
+    def register_with_panel(self):
+        try:
+            server_info = {{
+                'server_id': self.server_id,
+                'hostname': socket.gethostname(),
+                'ip_address': self.get_local_ip(),
+                'os_info': self.get_os_info(),
+                'agent_version': '1.0.0',
+                'timestamp': datetime.now().isoformat()
+            }}
+            
+            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/register"
+            response = requests.post(
+                url,
+                json=server_info,
+                timeout=10,
+                headers={{'Content-Type': 'application/json'}}
+            )
+            
+            if response.status_code == 200:
+                self.logger.info("Successfully registered with control panel")
+                return True
+            else:
+                self.logger.error(f"Registration failed: {{response.status_code}}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error registering with panel: {{e}}")
+            return False
+    
+    def get_local_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+    
+    def get_os_info(self):
+        try:
+            import platform
+            return {{
+                'system': platform.system(),
+                'release': platform.release(),
+                'version': platform.version(),
+                'machine': platform.machine(),
+                'processor': platform.processor()
+            }}
+        except:
+            return {{'system': 'Unknown'}}
+    
+    def heartbeat_loop(self):
+        while self.running:
+            self.send_heartbeat()
+            time.sleep(self.heartbeat_interval)
+    
+    def start(self):
+        self.logger.info(f"Starting Xpanel Agent (ID: {{self.server_id}})")
+        self.logger.info(f"Panel address: {{self.panel_address}}:{{self.panel_port}}")
+        
+        if not self.register_with_panel():
+            self.logger.error("Failed to register with panel, continuing anyway...")
+        
+        self.running = True
+        
+        heartbeat_thread = threading.Thread(target=self.heartbeat_loop, daemon=True)
+        heartbeat_thread.start()
+        
+        self.logger.info("Agent started successfully")
+        
+        try:
+            while self.running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.logger.info("Received interrupt signal, stopping agent...")
+            self.stop()
+    
+    def stop(self):
+        self.running = False
+        self.logger.info("Agent stopped")
+
+if __name__ == '__main__':
+    agent = XpanelAgent()
+    agent.start()
+AGENT_SCRIPT_EOF
+
+# Install Python dependencies
+print_status "Installing Python dependencies..."
+pip3 install psutil requests
+
+# Make agent executable
+chmod +x xpanel_agent.py
+chown -R $AGENT_USER:$AGENT_USER "$AGENT_DIR"
 
 # Create systemd service
 print_status "Creating systemd service..."
-cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+cat > /etc/systemd/system/$SERVICE_NAME.service << SERVICE_EOF
 [Unit]
-Description=Xpanel VPS Agent
+Description=Xpanel Agent
 After=network.target
 
 [Service]
 Type=simple
 User=$AGENT_USER
-Group=$AGENT_USER
 WorkingDirectory=$AGENT_DIR
-ExecStart=/usr/bin/python3 $AGENT_DIR/xpanel_agent.py --panel-address $PANEL_ADDRESS --panel-port $PANEL_PORT
+ExecStart=/usr/bin/python3 $AGENT_DIR/xpanel_agent.py
 Restart=always
 RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICE_EOF
 
-# Create log file
-print_status "Setting up logging..."
-touch /var/log/xpanel-agent.log
-chown "$AGENT_USER:$AGENT_USER" /var/log/xpanel-agent.log
-
-# Start service
+# Enable and start service
 print_status "Starting agent service..."
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
 systemctl start $SERVICE_NAME
 
 # Check service status
-sleep 3
 if systemctl is-active --quiet $SERVICE_NAME; then
-    print_status "Xpanel agent installed and started successfully!"
-    echo -e "${{GREEN}}Agent is now sending data to: $PANEL_ADDRESS:$PANEL_PORT${{NC}}"
+    print_status "Agent installed and started successfully!"
+    print_status "Service status: $(systemctl is-active $SERVICE_NAME)"
 else
-    print_error "Agent service failed to start"
+    print_error "Failed to start agent service"
     systemctl status $SERVICE_NAME
     exit 1
 fi
 
-echo -e "${{GREEN}}========================================${{NC}}"
-echo -e "${{GREEN}}    Installation Complete!${{NC}}"
-echo -e "${{GREEN}}========================================${{NC}}"
+print_status "Installation completed successfully!"
+echo -e "${{GREEN}}Agent is now running and sending data to panel${{NC}}"
 '''
 
         # Read agent script content

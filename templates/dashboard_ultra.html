@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xpanel - Ultra Dashboard</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_ultra.css') }}">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-cube"></i>
+                    </div>
+                    <div class="logo-text">Xpanel</div>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-item active">
+                        <div class="nav-icon">
+                            <i class="fas fa-tachometer-alt"></i>
+                        </div>
+                        <div class="nav-text">Dashboard</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div class="nav-text">Servers</div>
+                        <div class="nav-badge" id="servers-count">0</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <div class="nav-text">Terminal</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="nav-text">Analytics</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <div class="nav-text">Agents</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="nav-text">Security</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                    
+                    <div class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="nav-text">Settings</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-status">Online</div>
+                    </div>
+                    <button class="logout-btn" id="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-content">
+                    <div class="page-info">
+                        <div class="page-title">
+                            <div class="title-icon">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            Dashboard
+                        </div>
+                        <div class="page-description">Monitor and manage your VPS infrastructure</div>
+                    </div>
+                    
+                    <div class="header-actions">
+                        <button class="action-btn" id="notifications-btn">
+                            <i class="fas fa-bell"></i>
+                            <div class="notification-badge">3</div>
+                        </button>
+                        
+                        <button class="action-btn" id="refresh-btn">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        
+                        <button class="btn-primary" id="add-server-btn">
+                            <i class="fas fa-plus"></i>
+                            Add Server
+                        </button>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Content -->
+            <div class="content">
+                <!-- Stats Section -->
+                <section class="stats-section">
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                                <div class="stat-trend up">
+                                    <i class="fas fa-arrow-up"></i>
+                                    +12%
+                                </div>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-servers">0</div>
+                                <div class="stat-label">Total Servers</div>
+                            </div>
+                            <div class="stat-progress">
+                                <div class="progress-fill" style="width: 75%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="stat-trend up">
+                                    <i class="fas fa-arrow-up"></i>
+                                    +8%
+                                </div>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="active-servers">0</div>
+                                <div class="stat-label">Active Servers</div>
+                            </div>
+                            <div class="stat-progress">
+                                <div class="progress-fill" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card warning">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-microchip"></i>
+                                </div>
+                                <div class="stat-trend neutral">
+                                    <i class="fas fa-minus"></i>
+                                    0%
+                                </div>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="cpu-usage">0%</div>
+                                <div class="stat-label">Avg CPU Usage</div>
+                            </div>
+                            <div class="stat-progress">
+                                <div class="progress-fill" style="width: 45%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card danger">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-memory"></i>
+                                </div>
+                                <div class="stat-trend down">
+                                    <i class="fas fa-arrow-down"></i>
+                                    -5%
+                                </div>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="memory-usage">0%</div>
+                                <div class="stat-label">Avg Memory Usage</div>
+                            </div>
+                            <div class="stat-progress">
+                                <div class="progress-fill" style="width: 65%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Servers Section -->
+                <section class="servers-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <h2>Servers</h2>
+                            <div class="section-subtitle">Manage your VPS infrastructure</div>
+                        </div>
+                        
+                        <div class="section-controls">
+                            <div class="view-toggle">
+                                <button class="toggle-btn active" data-view="grid">
+                                    <i class="fas fa-th"></i>
+                                </button>
+                                <button class="toggle-btn" data-view="list">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="server-search" placeholder="Search servers...">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="servers-grid" id="servers-container">
+                        <!-- Server cards will be dynamically generated here -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Add Server Modal -->
+    <div class="modal" id="add-server-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-plus"></i>
+                    Add New Server
+                </div>
+                <button class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <form class="server-form" id="server-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="server-name">Server Name</label>
+                            <div class="input-group">
+                                <i class="fas fa-server"></i>
+                                <input type="text" id="server-name" name="name" placeholder="My VPS Server" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="server-host">Host/IP Address</label>
+                            <div class="input-group">
+                                <i class="fas fa-globe"></i>
+                                <input type="text" id="server-host" name="host" placeholder="192.168.1.100" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="server-port">SSH Port</label>
+                            <div class="input-group">
+                                <i class="fas fa-plug"></i>
+                                <input type="number" id="server-port" name="port" placeholder="22" value="22">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="server-username">Username</label>
+                            <div class="input-group">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="server-username" name="username" placeholder="root" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Authentication Method</label>
+                        <div class="auth-toggle">
+                            <input type="radio" id="auth-password" name="auth_type" value="password" checked>
+                            <label for="auth-password">
+                                <i class="fas fa-key"></i>
+                                Password
+                            </label>
+                            
+                            <input type="radio" id="auth-key" name="auth_type" value="key">
+                            <label for="auth-key">
+                                <i class="fas fa-file-alt"></i>
+                                SSH Key
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="password-field">
+                        <label for="server-password">Password</label>
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="server-password" name="password" placeholder="Enter password">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="key-field" style="display: none;">
+                        <label for="server-key">SSH Key Path</label>
+                        <div class="input-group">
+                            <i class="fas fa-file-alt"></i>
+                            <input type="text" id="server-key" name="key_file" placeholder="/path/to/private/key">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="server-description">Description (Optional)</label>
+                        <div class="input-group">
+                            <i class="fas fa-comment"></i>
+                            <textarea id="server-description" name="description" placeholder="Server description..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary modal-close">Cancel</button>
+                <button type="submit" form="server-form" class="btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Add Server
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Install Agent Modal -->
+    <div class="modal" id="install-agent-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-container large">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-download"></i>
+                    Installing Agent
+                </div>
+                <button class="modal-close" disabled>
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="progress-header">
+                    <div class="progress-info">
+                        <div class="progress-label">Installation Progress</div>
+                        <div class="progress-percentage" id="install-progress-percentage">0%</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div id="install-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-controls">
+                            <div class="control-dot red"></div>
+                            <div class="control-dot yellow"></div>
+                            <div class="control-dot green"></div>
+                        </div>
+                        <div class="terminal-title">Agent Installation</div>
+                    </div>
+                    <div class="terminal-body" id="install-terminal">
+                        <!-- Terminal output will be added here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeModal('install-agent-modal')">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading...</div>
+        </div>
+    </div>
+    
+    <!-- Notifications Container -->
+    <div class="notifications"></div>
+    
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard_ultra.js') }}"></script>
+</body>
+</html>
