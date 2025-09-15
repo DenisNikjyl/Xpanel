@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial data
     loadServers();
+    loadCustomActions();
     
     // Setup modal functionality
     setupModals();
@@ -231,14 +232,30 @@ async function handleAutoInstall(e) {
 }
 
 function loadServers() {
+    // Check if auth headers are available
+    if (!window.authHeaders) {
+        console.error('No auth headers available');
+        return;
+    }
+    
     fetch('/api/servers', {
         headers: window.authHeaders
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 422 || response.status === 401) {
+            // Token expired or invalid, redirect to login
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
+        }
+        return response.json();
+    })
     .then(data => {
-        window.servers = data.servers || [];
-        updateServersDisplay();
-        updateStatsDisplay();
+        if (data) {
+            window.servers = data.servers || [];
+            updateServersDisplay();
+            updateStatsDisplay();
+        }
     })
     .catch(error => {
         console.error('Error loading servers:', error);
@@ -640,14 +657,30 @@ async function handleAddAction(e) {
 }
 
 function loadCustomActions() {
+    // Check if auth headers are available
+    if (!window.authHeaders) {
+        console.error('No auth headers available');
+        return;
+    }
+    
     fetch('/api/custom-actions', {
         headers: window.authHeaders
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 422 || response.status === 401) {
+            // Token expired or invalid, redirect to login
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
+        }
+        return response.json();
+    })
     .then(data => {
-        window.customActions = data.actions || [];
-        updateCustomActionsDisplay();
-        updateServersDisplay(); // Update server table with new actions
+        if (data) {
+            window.customActions = data.actions || [];
+            updateCustomActionsDisplay();
+            updateServersDisplay(); // Update server table with new actions
+        }
     })
     .catch(error => {
         console.error('Error loading custom actions:', error);
@@ -778,3 +811,32 @@ window.deleteCustomAction = deleteCustomAction;
 window.testCustomAction = testCustomAction;
 window.editCustomAction = editCustomAction;
 window.logout = logout;
+
+// Add missing refreshDashboard function
+function refreshDashboard() {
+    loadServers();
+    loadCustomActions();
+    console.log('Dashboard refreshed');
+}
+
+window.refreshDashboard = refreshDashboard;
+
+// Add missing functions for copy and download buttons
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        const text = element.textContent || element.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            console.log('Copied to clipboard');
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+        });
+    }
+}
+
+function downloadInstallScript() {
+    window.open('/api/agent/install-script', '_blank');
+}
+
+window.copyToClipboard = copyToClipboard;
+window.downloadInstallScript = downloadInstallScript;
