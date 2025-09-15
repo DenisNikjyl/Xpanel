@@ -219,7 +219,7 @@ def execute_custom_action():
 
 @app.route('/api/servers/install-agent', methods=['POST'])
 @jwt_required()
-def install_agent():
+def install_agent_remote():
     """Automatically install agent on remote server"""
     data = request.get_json()
     
