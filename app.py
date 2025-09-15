@@ -76,6 +76,25 @@ def get_servers():
     servers = server_manager.get_all_servers()
     return jsonify({'servers': servers})
 
+@app.route('/api/system/stats', methods=['GET'])
+@jwt_required()
+def get_system_stats():
+    """Get system statistics"""
+    try:
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        network = psutil.net_io_counters()
+        
+        return jsonify({
+            'cpu': cpu_percent,
+            'memory': memory.percent,
+            'disk': disk.percent,
+            'network': network.bytes_sent + network.bytes_recv
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/servers', methods=['POST'])
 @jwt_required()
 def add_server():

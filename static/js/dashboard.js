@@ -1,19 +1,23 @@
 // Modern Dashboard JavaScript
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Dashboard loading...');
+    
+    // Wait for auth system to be ready
+    if (window.xpanelAuth) {
+        await window.xpanelAuth.initAuth();
+    }
+    
     // Initialize dashboard
     initDashboard();
+    
+    // Load initial data
+    await loadServers();
+    await loadCustomActions();
     
     // Setup navigation
     setupNavigation();
     
-    // Setup WebSocket connection
-    setupWebSocket();
-    
-    // Load initial data
-    loadServers();
-    loadCustomActions();
-    
-    // Setup modal functionality
+    // Setup modals
     setupModals();
     
     // Setup sidebar toggle for mobile
@@ -21,6 +25,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Setup language switcher
     setupLanguageSwitcher();
+    
+    // Initialize WebSocket connection
+    if (window.WebSocketManager) {
+        window.WebSocketManager.connect();
+    }
+    
+    // Start system monitoring
+    startSystemMonitoring();
 });
 
 function initDashboard() {
@@ -36,6 +48,80 @@ function initDashboard() {
     
     // Initialize servers array
     window.servers = [];
+}
+
+async function refreshDashboard() {
+    console.log('Refreshing dashboard...');
+    
+    // Show refresh animation
+    const refreshBtn = document.querySelector('.btn[onclick="refreshDashboard()"]');
+    if (refreshBtn) {
+        const icon = refreshBtn.querySelector('i');
+        icon.classList.add('fa-spin');
+        refreshBtn.disabled = true;
+    }
+    
+    try {
+        await Promise.all([
+            loadServers(),
+            loadCustomActions(),
+            updateSystemStats()
+        ]);
+        
+        console.log('Dashboard refreshed successfully');
+    } catch (error) {
+        console.error('Error refreshing dashboard:', error);
+    } finally {
+        // Remove refresh animation
+        if (refreshBtn) {
+            const icon = refreshBtn.querySelector('i');
+            icon.classList.remove('fa-spin');
+            refreshBtn.disabled = false;
+        }
+    }
+}
+
+// System monitoring functions
+function startSystemMonitoring() {
+    // Update system stats every 5 seconds
+    updateSystemStats();
+    setInterval(updateSystemStats, 5000);
+}
+
+async function updateSystemStats() {
+    try {
+        const response = await window.xpanelAuth.apiRequest('/api/system/stats');
+        if (!response) return;
+        
+        const data = await response.json();
+        
+        // Update CPU usage
+        const cpuElement = document.getElementById('cpu-usage');
+        if (cpuElement && data.cpu !== undefined) {
+            cpuElement.textContent = `${Math.round(data.cpu)}%`;
+        }
+        
+        // Update Memory usage
+        const memoryElement = document.getElementById('memory-usage');
+        if (memoryElement && data.memory !== undefined) {
+            memoryElement.textContent = `${Math.round(data.memory)}%`;
+        }
+        
+        // Update Disk usage
+        const diskElement = document.getElementById('disk-usage');
+        if (diskElement && data.disk !== undefined) {
+            diskElement.textContent = `${Math.round(data.disk)}%`;
+        }
+        
+        // Update Network usage
+        const networkElement = document.getElementById('network-usage');
+        if (networkElement && data.network !== undefined) {
+            networkElement.textContent = `${(data.network / 1024 / 1024).toFixed(1)} MB/s`;
+        }
+        
+    } catch (error) {
+        console.error('Error updating system stats:', error);
+    }
 }
 
 function setupSidebarToggle() {

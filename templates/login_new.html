@@ -6,97 +6,138 @@
     <title>Вход - Xpanel</title>
     <link rel="stylesheet" href="/static/css/auth.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Animated Background -->
+    <div class="auth-background">
+        <div class="floating-shape shape-1"></div>
+        <div class="floating-shape shape-2"></div>
+        <div class="floating-shape shape-3"></div>
+    </div>
+
     <div class="auth-container">
-        <div class="auth-card">
-            <div class="auth-header">
-                <div class="logo">
-                    <i class="fas fa-server"></i>
-                    <h1>Xpanel</h1>
-                </div>
-                <p>Войдите в панель управления</p>
+        <div class="auth-content">
+            <!-- Language Switcher -->
+            <div class="language-switcher-auth">
+                <button class="lang-btn active">RU</button>
+                <button class="lang-btn">EN</button>
             </div>
 
-            <form id="loginForm" class="auth-form">
-                <div class="form-group">
-                    <label for="username">
-                        <i class="fas fa-user"></i>
-                        Логин
-                    </label>
-                    <input type="text" id="username" name="username" required autocomplete="username">
+            <div class="auth-card" id="loginCard">
+                <div class="auth-header">
+                    <div class="brand">
+                        <i class="fas fa-server brand-icon"></i>
+                        <span class="brand-text">Xpanel</span>
+                    </div>
+                    <h2 class="auth-title">Добро пожаловать!</h2>
+                    <p class="auth-subtitle">Войдите в панель управления серверами</p>
                 </div>
 
-                <div class="form-group">
-                    <label for="password">
-                        <i class="fas fa-lock"></i>
-                        Пароль
-                    </label>
-                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                <form id="loginForm" class="auth-form">
+                    <div class="form-group">
+                        <label class="form-label" for="username">
+                            <i class="fas fa-user"></i>
+                            Имя пользователя
+                        </label>
+                        <input type="text" id="username" name="username" class="form-input" placeholder="Введите логин" required autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">
+                            <i class="fas fa-lock"></i>
+                            Пароль
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="password" name="password" class="form-input" placeholder="Введите пароль" required autocomplete="current-password">
+                            <button type="button" class="password-toggle" onclick="togglePassword('password')">
+                                <i class="fas fa-eye" id="password-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="remember">
+                            <span class="checkmark"></span>
+                            Запомнить меня
+                        </label>
+                        <a href="#" class="forgot-password">Забыли пароль?</a>
+                    </div>
+
+                    <button type="submit" class="auth-button" id="loginBtn">
+                        <span class="button-icon"><i class="fas fa-sign-in-alt"></i></span>
+                        <span class="button-text">Войти в систему</span>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Нет аккаунта? <a href="#" class="auth-link" onclick="showRegisterForm()">Создать аккаунт</a></p>
                 </div>
 
-                <button type="submit" class="auth-btn" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Войти
-                </button>
-            </form>
-
-            <div class="auth-footer">
-                <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
+                <div id="errorMessage" class="error-message" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span></span>
+                </div>
+                <div id="successMessage" class="success-message" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span></span>
+                </div>
             </div>
 
-            <div id="errorMessage" class="error-message" style="display: none;"></div>
-            <div id="successMessage" class="success-message" style="display: none;"></div>
-        </div>
-
-        <!-- Registration Form (Hidden by default) -->
-        <div class="auth-card" id="registerCard" style="display: none;">
-            <div class="auth-header">
-                <div class="logo">
-                    <i class="fas fa-server"></i>
-                    <h1>Xpanel</h1>
-                </div>
-                <p>Создать новый аккаунт</p>
-            </div>
-
-            <form id="registerForm" class="auth-form">
-                <div class="form-group">
-                    <label for="regUsername">
-                        <i class="fas fa-user"></i>
-                        Логин
-                    </label>
-                    <input type="text" id="regUsername" name="username" required minlength="3">
-                    <small>Минимум 3 символа</small>
+            <!-- Registration Form (Hidden by default) -->
+            <div class="auth-card" id="registerCard" style="display: none;">
+                <div class="auth-header">
+                    <div class="brand">
+                        <i class="fas fa-server brand-icon"></i>
+                        <span class="brand-text">Xpanel</span>
+                    </div>
+                    <h2 class="auth-title">Создать аккаунт</h2>
+                    <p class="auth-subtitle">Зарегистрируйтесь для доступа к панели</p>
                 </div>
 
-                <div class="form-group">
-                    <label for="regPassword">
-                        <i class="fas fa-lock"></i>
-                        Пароль
-                    </label>
-                    <input type="password" id="regPassword" name="password" required minlength="6">
-                    <small>Минимум 6 символов</small>
+                <form id="registerForm" class="auth-form">
+                    <div class="form-group">
+                        <label class="form-label" for="regUsername">
+                            <i class="fas fa-user"></i>
+                            Имя пользователя
+                        </label>
+                        <input type="text" id="regUsername" name="username" class="form-input" placeholder="Минимум 3 символа" required minlength="3">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="regPassword">
+                            <i class="fas fa-lock"></i>
+                            Пароль
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="regPassword" name="password" class="form-input" placeholder="Минимум 6 символов" required minlength="6">
+                            <button type="button" class="password-toggle" onclick="togglePassword('regPassword')">
+                                <i class="fas fa-eye" id="regPassword-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="regRole">
+                            <i class="fas fa-user-tag"></i>
+                            Роль пользователя
+                        </label>
+                        <select id="regRole" name="role" class="form-input">
+                            <option value="user">Пользователь</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="auth-button" id="registerBtn">
+                        <span class="button-icon"><i class="fas fa-user-plus"></i></span>
+                        <span class="button-text">Создать аккаунт</span>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Уже есть аккаунт? <a href="#" class="auth-link" onclick="showLoginForm()">Войти в систему</a></p>
                 </div>
-
-                <div class="form-group">
-                    <label for="regRole">
-                        <i class="fas fa-user-tag"></i>
-                        Роль
-                    </label>
-                    <select id="regRole" name="role">
-                        <option value="user">Пользователь</option>
-                        <option value="admin">Администратор</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="auth-btn" id="registerBtn">
-                    <i class="fas fa-user-plus"></i>
-                    Зарегистрироваться
-                </button>
-            </form>
-
-            <div class="auth-footer">
-                <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
             </div>
         </div>
     </div>
@@ -172,14 +213,21 @@
             });
 
             function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
+                const errorSpan = errorMessage.querySelector('span');
+                errorSpan.textContent = message;
+                errorMessage.style.display = 'flex';
                 successMessage.style.display = 'none';
+                
+                // Add shake animation to card
+                const activeCard = document.querySelector('.auth-card:not([style*="display: none"])');
+                activeCard.classList.add('shake');
+                setTimeout(() => activeCard.classList.remove('shake'), 500);
             }
 
             function showSuccess(message) {
-                successMessage.textContent = message;
-                successMessage.style.display = 'block';
+                const successSpan = successMessage.querySelector('span');
+                successSpan.textContent = message;
+                successMessage.style.display = 'flex';
                 errorMessage.style.display = 'none';
             }
 
@@ -187,6 +235,33 @@
                 errorMessage.style.display = 'none';
                 successMessage.style.display = 'none';
             }
+
+            // Password toggle function
+            window.togglePassword = function(inputId) {
+                const input = document.getElementById(inputId);
+                const icon = document.getElementById(inputId + '-eye');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            };
+
+            // Form focus animations
+            document.querySelectorAll('.form-input').forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.closest('.form-group').classList.add('focused');
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.closest('.form-group').classList.remove('focused');
+                });
+            });
 
             // Global functions for form switching
             window.showRegisterForm = function() {

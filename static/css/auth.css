@@ -366,6 +366,20 @@ body {
     animation: slideInDown 0.3s ease-out;
 }
 
+.success-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-color);
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    animation: slideInDown 0.3s ease-out;
+}
+
 @keyframes slideInDown {
     from {
         opacity: 0;
