@@ -1,0 +1,45 @@
+# Быстрые команды для настройки DNS на сервере
+
+# 1. Загрузить и запустить скрипт настройки DNS
+wget https://raw.githubusercontent.com/your-repo/fix-dns.sh -O fix-dns.sh
+chmod +x fix-dns.sh
+./fix-dns.sh
+
+# 2. Или настроить DNS вручную:
+
+# Создать резервную копию
+cp /etc/resolv.conf /etc/resolv.conf.backup
+
+# Настроить новые DNS
+cat > /etc/resolv.conf << EOF
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
+
+# Защитить от изменений
+chattr +i /etc/resolv.conf
+
+# 3. Настроить npm после смены DNS:
+npm config set timeout 120000
+npm config set registry https://registry.npmjs.org/
+npm config set prefer-ipv4 true
+
+# 4. Тестирование:
+nslookup registry.npmjs.org
+npm ping
+
+# 5. Повторить установку:
+cd /root/a
+npm install
+
+# 6. Если не помогает, попробовать yarn:
+curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+apt update && apt install yarn
+yarn install
+
+# 7. Восстановить оригинальные DNS (если нужно):
+chattr -i /etc/resolv.conf
+cp /etc/resolv.conf.backup /etc/resolv.conf
