@@ -6,6 +6,8 @@ import paramiko
 import psutil
 import json
 import uuid
+import os
+import io
 from datetime import datetime
 import threading
 import time
@@ -362,75 +364,165 @@ class ServerManager:
 
     def install_agent_remote(self, host, port=22, username=None, password=None, key_file=None, panel_address="64.188.70.12"):
         """Automatically install agent on remote server via SSH"""
+        steps = []
+        detailed_output = []
+        
         try:
+            steps.append("Connecting to server...")
+            detailed_output.append(f"[INFO] Connecting to {username}@{host}:{port}")
+            
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
             # Connect to server
             if key_file:
-                ssh.connect(hostname=host, port=port, username=username, key_filename=key_file)
+                ssh.connect(hostname=host, port=port, username=username, key_filename=key_file, timeout=30)
             else:
-                ssh.connect(hostname=host, port=port, username=username, password=password)
+                ssh.connect(hostname=host, port=port, username=username, password=password, timeout=30)
             
-            # Generate installation script
+            detailed_output.append("[SUCCESS] SSH connection established")
+            
+            # Step 1: Check system requirements
+            steps.append("Checking system requirements...")
+            detailed_output.append("[INFO] Checking system requirements...")
+            
+            stdin, stdout, stderr = ssh.exec_command("uname -a && python3 --version && systemctl --version")
+            system_info = stdout.read().decode().strip()
+            detailed_output.append(f"[INFO] System: {system_info.split()[0]} {system_info.split()[2]}")
+            
+            # Step 2: Create installation directory
+            steps.append("Creating installation directory...")
+            detailed_output.append("[INFO] Creating /opt/xpanel-agent directory...")
+            
+            stdin, stdout, stderr = ssh.exec_command("sudo mkdir -p /opt/xpanel-agent")
+            stdout.read()
+            detailed_output.append("[SUCCESS] Directory created")
+            
+            # Step 3: Download agent files
+            steps.append("Downloading agent files...")
+            detailed_output.append("[INFO] Downloading xpanel_agent.py...")
+            
+            # Generate installation script content
             install_script = self.generate_install_script(panel_address)
             
-            # Upload and execute installation script
-            steps = []
-            
-            # Step 1: Create temporary script file
-            steps.append("Creating installation script...")
+            # Create temporary script file
             stdin, stdout, stderr = ssh.exec_command("mktemp")
             script_path = stdout.read().decode().strip()
             
             if stderr.read():
                 raise Exception("Failed to create temporary file")
             
-            # Step 2: Upload script content
-            steps.append("Uploading installation script...")
+            # Upload script content via SFTP
             sftp = ssh.open_sftp()
             with sftp.file(script_path, 'w') as f:
                 f.write(install_script)
             sftp.close()
+            detailed_output.append("[SUCCESS] Agent files downloaded")
             
-            # Step 3: Make script executable
-            steps.append("Making script executable...")
-            stdin, stdout, stderr = ssh.exec_command(f"chmod +x {script_path}")
-            stdout.read()  # Wait for completion
+            # Step 4: Install dependencies
+            steps.append("Installing dependencies...")
+            detailed_output.append("[INFO] Installing Python dependencies...")
             
-            # Step 4: Execute installation script
-            steps.append("Executing installation script...")
-            stdin, stdout, stderr = ssh.exec_command(f"sudo {script_path} --panel-address {panel_address}")
+            stdin, stdout, stderr = ssh.exec_command("sudo apt-get update -qq && sudo apt-get install -y python3-pip python3-requests")
+            dep_output = stdout.read().decode()
+            dep_error = stderr.read().decode()
+            
+            if "E:" in dep_error:
+                detailed_output.append("[WARNING] Some packages may already be installed")
+            else:
+                detailed_output.append("[SUCCESS] Dependencies installed")
+            
+            # Step 5: Make script executable and run
+            steps.append("Configuring agent service...")
+            detailed_output.append("[INFO] Making installation script executable...")
+            
+            stdin, stdout, stderr = ssh.exec_command("chmod +x " + script_path)
+            stdout.read()
+            
+            # Step 6: Execute installation script
+            steps.append("Starting agent...")
+            detailed_output.append("[INFO] Executing installation script...")
+            
+            install_command = "sudo " + script_path + " --panel-address " + panel_address
+            stdin, stdout, stderr = ssh.exec_command(install_command)
             
             output = stdout.read().decode()
             error = stderr.read().decode()
             exit_code = stdout.channel.recv_exit_status()
             
-            # Step 5: Cleanup
+            if output:
+                detailed_output.append(f"[OUTPUT] {output.strip()}")
+            
+            # Step 7: Verify installation
+            steps.append("Verifying connection...")
+            detailed_output.append("[INFO] Verifying agent installation...")
+            
+            stdin, stdout, stderr = ssh.exec_command("sudo systemctl status xpanel-agent --no-pager")
+            status_output = stdout.read().decode()
+            
+            if "active (running)" in status_output:
+                detailed_output.append("[SUCCESS] Agent is running and active")
+            elif "inactive" in status_output:
+                detailed_output.append("[WARNING] Agent installed but not running")
+            else:
+                detailed_output.append("[INFO] Agent status unknown")
+            
+            # Step 8: Cleanup
             steps.append("Cleaning up...")
-            ssh.exec_command(f"rm -f {script_path}")
+            detailed_output.append("[INFO] Cleaning up temporary files...")
+            
+            ssh.exec_command("rm -f " + script_path)
+            detailed_output.append("[SUCCESS] Cleanup completed")
             
             ssh.close()
             
             if exit_code == 0:
+                detailed_output.append("[SUCCESS] Agent installation completed successfully!")
                 return {
                     'success': True,
                     'message': 'Agent installed successfully',
                     'steps': steps,
-                    'output': output
+                    'output': '\n'.join(detailed_output),
+                    'detailed_log': detailed_output
                 }
             else:
+                detailed_output.append(f"[ERROR] Installation failed with exit code {exit_code}")
+                if error:
+                    detailed_output.append(f"[ERROR] {error.strip()}")
                 return {
                     'success': False,
                     'error': f'Installation failed with exit code {exit_code}',
-                    'output': output,
-                    'stderr': error
+                    'output': '\n'.join(detailed_output),
+                    'stderr': error,
+                    'detailed_log': detailed_output
                 }
                 
-        except Exception as e:
+        except paramiko.AuthenticationException as e:
+            error_msg = f"Authentication failed: {str(e)}"
+            detailed_output.append(f"[ERROR] {error_msg}")
             return {
                 'success': False,
-                'error': f'SSH connection failed: {str(e)}'
+                'error': error_msg,
+                'output': '\n'.join(detailed_output),
+                'detailed_log': detailed_output
+            }
+        except paramiko.SSHException as e:
+            error_msg = f"SSH connection error: {str(e)}"
+            detailed_output.append(f"[ERROR] {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'output': '\n'.join(detailed_output),
+                'detailed_log': detailed_output
+            }
+        except Exception as e:
+            error_msg = f"Installation failed: {str(e)}"
+            detailed_output.append(f"[ERROR] {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'output': '\n'.join(detailed_output),
+                'detailed_log': detailed_output
             }
     
     def restart_agent(self, agent_id):

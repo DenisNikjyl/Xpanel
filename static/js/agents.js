@@ -495,41 +495,84 @@ class AgentsManager {
     }
 
     async simulateInstallation(installData) {
-        const steps = [
-            { text: 'Подключение к серверу...', progress: 10 },
-            { text: 'Проверка системных требований...', progress: 20 },
-            { text: 'Загрузка агента мониторинга...', progress: 40 },
-            { text: 'Установка зависимостей...', progress: 60 },
-            { text: 'Настройка службы...', progress: 80 },
-            { text: 'Запуск агента...', progress: 90 },
-            { text: 'Проверка соединения...', progress: 100 }
-        ];
-
         this.addConsoleMessage(`Начало установки на ${installData.host}:${installData.port}`, 'info');
 
-        for (let i = 0; i < steps.length; i++) {
-            const step = steps[i];
-            
-            this.addConsoleMessage(step.text, 'info');
-            this.updateProgress(step.progress, step.text);
-            
-            // Симуляция времени выполнения
-            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
-            
-            if (i === 3) {
-                this.addConsoleMessage('Установка Python зависимостей...', 'success');
-                this.addConsoleMessage('Настройка конфигурации панели...', 'success');
-            }
-        }
+        try {
+            // Выполняем реальную установку через API
+            const response = await fetch('/api/servers/install-agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                },
+                body: JSON.stringify({
+                    host: installData.host,
+                    port: installData.port,
+                    username: installData.username,
+                    password: installData.password,
+                    panel_address: window.location.hostname
+                })
+            });
 
-        this.addConsoleMessage('Агент успешно установлен и запущен!', 'success');
-        this.addConsoleMessage('Агент подключен к панели управления', 'success');
+            const result = await response.json();
+            
+            if (result.success) {
+                // Показываем реальные шаги установки
+                if (result.detailed_log) {
+                    for (let i = 0; i < result.detailed_log.length; i++) {
+                        const logEntry = result.detailed_log[i];
+                        const progress = ((i + 1) / result.detailed_log.length) * 100;
+                        
+                        // Определяем тип сообщения
+                        let messageType = 'info';
+                        if (logEntry.includes('[SUCCESS]')) messageType = 'success';
+                        else if (logEntry.includes('[ERROR]')) messageType = 'error';
+                        else if (logEntry.includes('[WARNING]')) messageType = 'warning';
+                        
+                        this.addConsoleMessage(logEntry, messageType);
+                        this.updateProgress(progress, logEntry.replace(/\[.*?\]\s*/, ''));
+                        
+                        // Небольшая задержка для визуального эффекта
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    // Fallback к базовому выводу
+                    this.addConsoleMessage(result.output || 'Агент успешно установлен!', 'success');
+                    this.updateProgress(100, 'Установка завершена');
+                }
+                
+                this.addConsoleMessage('Агент подключен к панели управления', 'success');
+                this.showNotification('Агент успешно установлен!', 'success');
+                
+            } else {
+                // Обработка ошибок
+                if (result.detailed_log) {
+                    for (const logEntry of result.detailed_log) {
+                        let messageType = 'info';
+                        if (logEntry.includes('[ERROR]')) messageType = 'error';
+                        else if (logEntry.includes('[WARNING]')) messageType = 'warning';
+                        else if (logEntry.includes('[SUCCESS]')) messageType = 'success';
+                        
+                        this.addConsoleMessage(logEntry, messageType);
+                    }
+                } else {
+                    this.addConsoleMessage(`Ошибка установки: ${result.error}`, 'error');
+                }
+                
+                this.updateProgress(100, 'Установка не удалась');
+                this.showNotification('Ошибка установки агента', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Installation error:', error);
+            this.addConsoleMessage(`Ошибка сети: ${error.message}`, 'error');
+            this.updateProgress(100, 'Ошибка подключения');
+            this.showNotification('Ошибка подключения к серверу', 'error');
+        }
         
         // Показываем кнопку завершения
         document.getElementById('startInstall').style.display = 'none';
         document.getElementById('finishInstall').style.display = 'block';
-        
-        this.showNotification('Агент успешно установлен!', 'success');
     }
 
     finishInstallation() {
