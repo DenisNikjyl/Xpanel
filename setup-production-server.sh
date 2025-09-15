@@ -43,7 +43,25 @@ print_header "2. Installing Node.js dependencies..."
 cd /root/Xpanels/server
 npm install --production
 
-print_header "3. Setting up production environment..."
+print_header "3. Building React client..."
+cd /root/Xpanels/client
+npm install
+# Create production .env for React
+cat > .env << EOF
+REACT_APP_API_URL=http://64.188.70.12:3001
+REACT_APP_WS_URL=ws://64.188.70.12:3001
+GENERATE_SOURCEMAP=false
+EOF
+npm run build
+if [ -d "build" ]; then
+    print_status "React client built successfully"
+else
+    print_error "Failed to build React client"
+    exit 1
+fi
+cd /root/Xpanels/server
+
+print_header "4. Setting up production environment..."
 # Copy production env file
 if [ -f "../.env.production" ]; then
     cp ../.env.production .env
@@ -68,26 +86,44 @@ AGENT_CHECK_INTERVAL=30000
 EOF
 fi
 
-print_header "4. Creating uploads directory..."
+print_header "5. Creating uploads directory..."
 mkdir -p uploads
 chmod 755 uploads
 
-print_header "5. Starting Xpanel with PM2..."
+print_header "6. Starting Xpanel with PM2..."
 pm2 start index.js --name "xpanel" --env production
 
-print_header "6. Setting up PM2 startup..."
+print_header "7. Setting up PM2 startup..."
 pm2 startup
 pm2 save
 
-print_header "7. Configuring Nginx (if exists)..."
+print_header "8. Configuring Nginx (if exists)..."
 if command -v nginx &> /dev/null; then
     # Create Nginx config for Xpanel
     cat > /etc/nginx/sites-available/xpanel << EOF
 server {
     listen 80;
     server_name xpanel.xload.ru 64.188.70.12;
-
-    location / {
+    
+    # Корневая директория для статических файлов
+    root /root/Xpanels/client/build;
+    index index.html;
+    
+    # Gzip сжатие
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    
+    # Кэширование статических файлов
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files \$uri =404;
+    }
+    
+    # API маршруты
+    location /api/ {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -99,6 +135,7 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
+    # Socket.IO
     location /socket.io/ {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
@@ -108,6 +145,11 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+    
+    # React Router - все остальные запросы направляем на index.html
+    location / {
+        try_files \$uri \$uri/ /index.html;
     }
 }
 EOF
@@ -120,14 +162,14 @@ else
     print_warning "Nginx not found, skipping web server configuration"
 fi
 
-print_header "8. Setting up firewall..."
+print_header "9. Setting up firewall..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 3001/tcp
 ufw --force enable
 
-print_header "9. Checking service status..."
+print_header "10. Checking service status..."
 sleep 3
 pm2 status
 pm2 logs xpanel --lines 10
