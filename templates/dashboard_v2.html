@@ -325,7 +325,7 @@
                                 </div>
                                 <div class="terminal-input-container">
                                     <span class="terminal-prompt">admin@xpanel:~$</span>
-                                    <input type="text" id="terminal-input" style="background: transparent; border: none; outline: none; color: #fff; flex: 1; font-family: inherit;" placeholder="Введите команду...">
+                                    <input type="text" id="terminal-input" class="terminal-input" placeholder="Введите команду...">
                                 </div>
                             </div>
                         </div>
@@ -381,7 +381,7 @@
                         <p class="page-subtitle">Конфигурация панели управления</p>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
+                    <div class="settings-grid">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">
@@ -390,17 +390,17 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div class="settings-row">
                                     <label class="settings-label">Тема интерфейса</label>
-                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
+                                    <select class="btn btn-secondary custom-select">
                                         <option>Темная</option>
                                         <option>Светлая</option>
                                         <option>Автоматически</option>
                                     </select>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div class="settings-row">
                                     <label class="settings-label">Язык</label>
-                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
+                                    <select class="btn btn-secondary custom-select">
                                         <option>Русский</option>
                                         <option>English</option>
                                     </select>
@@ -416,13 +416,13 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div class="settings-row">
                                     <label class="settings-label">Двухфакторная аутентификация</label>
                                     <input type="checkbox" class="settings-checkbox">
                                 </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div class="settings-row">
                                     <label class="settings-label">Автоматический выход</label>
-                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
+                                    <select class="btn btn-secondary custom-select">
                                         <option>30 минут</option>
                                         <option>1 час</option>
                                         <option>4 часа</option>
