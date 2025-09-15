@@ -635,52 +635,6 @@ def execute_command():
     except Exception as e:
         return jsonify({'message': f'Ошибка: {str(e)}'}), 500
 
-@app.route('/api/system/stats', methods=['GET'])
-def get_local_stats():
-    """Get local system statistics"""
-    try:
-        # CPU usage
-        cpu_percent = psutil.cpu_percent(interval=1)
-        
-        # Memory usage
-        memory = psutil.virtual_memory()
-        
-        # Disk usage
-        disk = psutil.disk_usage('/')
-        
-        # Network stats
-        network = psutil.net_io_counters()
-        
-        stats = {
-            'cpu': {
-                'usage': cpu_percent,
-                'cores': psutil.cpu_count()
-            },
-            'memory': {
-                'total': memory.total,
-                'available': memory.available,
-                'used': memory.used,
-                'percent': memory.percent
-            },
-            'disk': {
-                'total': disk.total,
-                'used': disk.used,
-                'free': disk.free,
-                'percent': (disk.used / disk.total) * 100
-            },
-            'network': {
-                'bytes_sent': network.bytes_sent,
-                'bytes_recv': network.bytes_recv,
-                'packets_sent': network.packets_sent,
-                'packets_recv': network.packets_recv
-            },
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        return jsonify(stats)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 # SocketIO event handlers
 @socketio.on('connect')
 def handle_connect():
