@@ -1,0 +1,443 @@
+// Modern Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize dashboard
+    initDashboard();
+    
+    // Setup navigation
+    setupNavigation();
+    
+    // Setup WebSocket connection
+    setupWebSocket();
+    
+    // Load initial data
+    loadServers();
+    
+    // Setup modal functionality
+    setupModals();
+    
+    // Setup sidebar toggle for mobile
+    setupSidebarToggle();
+    
+    // Setup language switcher
+    setupLanguageSwitcher();
+});
+
+function initDashboard() {
+    // Check authentication
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+    
+    // Set authorization header for all requests
+    window.authHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
+    
+    // Initialize servers array
+    window.servers = [];
+}
+
+function setupSidebarToggle() {
+    const sidebarToggle = document.querySelector('.sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('active');
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && 
+                !sidebar.contains(e.target) && 
+                !sidebarToggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+            }
+        });
+    }
+}
+
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = document.querySelectorAll('.content-section');
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const sectionId = item.dataset.section;
+            
+            // Update active nav item
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+            
+            // Show corresponding section
+            sections.forEach(section => section.classList.remove('active'));
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+        });
+    });
+}
+
+function setupModals() {
+    // Setup tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Remove active class from all tabs
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            const targetTab = document.getElementById(tabName + '-tab');
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+        });
+    });
+    
+    // Setup auto install form
+    const autoInstallForm = document.getElementById('autoInstallForm');
+    if (autoInstallForm) {
+        autoInstallForm.addEventListener('submit', handleAutoInstall);
+    }
+    
+    // Setup copy buttons
+    setupCopyButtons();
+}
+
+function setupCopyButtons() {
+    const copyBtns = document.querySelectorAll('.copy-btn');
+    copyBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const codeBlock = this.parentElement.querySelector('code');
+            if (codeBlock) {
+                navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                    const originalIcon = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(() => {
+                        this.innerHTML = originalIcon;
+                    }, 2000);
+                });
+            }
+        });
+    });
+}
+
+function setupLanguageSwitcher() {
+    const langBtns = document.querySelectorAll('.lang-btn');
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const lang = this.dataset.lang;
+            switchLanguage(lang);
+        });
+    });
+}
+
+function switchLanguage(lang) {
+    if (lang === 'ru') {
+        window.location.href = '/dashboard/ru';
+    } else {
+        window.location.href = '/dashboard';
+    }
+}
+
+function showAddServerModal() {
+    const modal = document.getElementById('addServerModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function closeAddServerModal() {
+    const modal = document.getElementById('addServerModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+async function handleAutoInstall(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const serverData = {
+        name: formData.get('name'),
+        host: formData.get('host'),
+        port: parseInt(formData.get('port')),
+        username: formData.get('username'),
+        password: formData.get('password')
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    try {
+        // Show loading state
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Устанавливаем...';
+        submitBtn.disabled = true;
+        
+        const response = await fetch('/api/install-agent', {
+            method: 'POST',
+            headers: window.authHeaders,
+            body: JSON.stringify(serverData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> Установлено!';
+            submitBtn.classList.add('success');
+            
+            setTimeout(() => {
+                closeAddServerModal();
+                loadServers(); // Reload servers list
+                
+                // Reset form
+                e.target.reset();
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('success');
+            }, 2000);
+            
+        } else {
+            throw new Error(result.message || 'Ошибка установки агента');
+        }
+        
+    } catch (error) {
+        // Error handling
+        submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Ошибка';
+        submitBtn.classList.add('error');
+        
+        // Show error message
+        alert('Ошибка: ' + error.message);
+        
+        setTimeout(() => {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('error');
+        }, 3000);
+    }
+}
+
+function loadServers() {
+    fetch('/api/servers', {
+        headers: window.authHeaders
+    })
+    .then(response => response.json())
+    .then(data => {
+        window.servers = data.servers || [];
+        updateServersDisplay();
+        updateStatsDisplay();
+    })
+    .catch(error => {
+        console.error('Error loading servers:', error);
+        window.servers = [];
+        updateServersDisplay();
+        updateStatsDisplay();
+    });
+}
+
+function updateServersDisplay() {
+    const emptyState = document.getElementById('empty-state');
+    const serversList = document.getElementById('servers-list');
+    const serversTableBody = document.getElementById('servers-table-body');
+    const quickStats = document.getElementById('quick-stats');
+    
+    if (window.servers.length === 0) {
+        // Show empty state
+        if (emptyState) emptyState.style.display = 'block';
+        if (serversList) serversList.style.display = 'none';
+        if (quickStats) quickStats.style.display = 'none';
+        
+        // Show empty table
+        if (serversTableBody) {
+            serversTableBody.innerHTML = `
+                <tr class="empty-row">
+                    <td colspan="7">
+                        <div class="empty-table">
+                            <i class="fas fa-server"></i>
+                            <p>Нет добавленных серверов</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    } else {
+        // Show servers
+        if (emptyState) emptyState.style.display = 'none';
+        if (serversList) serversList.style.display = 'block';
+        if (quickStats) quickStats.style.display = 'grid';
+        
+        // Update servers table
+        if (serversTableBody) {
+            serversTableBody.innerHTML = window.servers.map(server => `
+                <tr>
+                    <td><strong>${server.name}</strong></td>
+                    <td>${server.host}</td>
+                    <td>
+                        <span class="status-badge ${server.status === 'online' ? 'online' : 'offline'}">
+                            ${server.status === 'online' ? 'Онлайн' : 'Офлайн'}
+                        </span>
+                    </td>
+                    <td>${server.cpu_usage || '0'}%</td>
+                    <td>${server.memory_usage || '0'}%</td>
+                    <td>${server.disk_usage || '0'}%</td>
+                    <td>
+                        <button class="btn-small" onclick="connectToServer('${server.id}')">
+                            <i class="fas fa-terminal"></i>
+                        </button>
+                        <button class="btn-small" onclick="removeServer('${server.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+}
+
+function updateStatsDisplay() {
+    if (window.servers.length === 0) {
+        return; // Don't show stats when no servers
+    }
+    
+    // Calculate average stats from all servers
+    let totalCpu = 0, totalMemory = 0, totalDisk = 0, totalNetwork = 0;
+    let onlineServers = 0;
+    
+    window.servers.forEach(server => {
+        if (server.status === 'online') {
+            totalCpu += parseFloat(server.cpu_usage || 0);
+            totalMemory += parseFloat(server.memory_usage || 0);
+            totalDisk += parseFloat(server.disk_usage || 0);
+            totalNetwork += parseFloat(server.network_usage || 0);
+            onlineServers++;
+        }
+    });
+    
+    if (onlineServers > 0) {
+        const avgCpu = (totalCpu / onlineServers).toFixed(1);
+        const avgMemory = (totalMemory / onlineServers).toFixed(1);
+        const avgDisk = (totalDisk / onlineServers).toFixed(1);
+        const avgNetwork = (totalNetwork / onlineServers).toFixed(1);
+        
+        // Update stat cards
+        const cpuElement = document.getElementById('cpu-usage');
+        const memoryElement = document.getElementById('memory-usage');
+        const diskElement = document.getElementById('disk-usage');
+        const networkElement = document.getElementById('network-usage');
+        
+        if (cpuElement) cpuElement.textContent = avgCpu + '%';
+        if (memoryElement) memoryElement.textContent = avgMemory + '%';
+        if (diskElement) diskElement.textContent = avgDisk + '%';
+        if (networkElement) networkElement.textContent = avgNetwork + ' MB/s';
+    }
+}
+
+function setupWebSocket() {
+    // WebSocket connection for real-time updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    try {
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function() {
+            console.log('WebSocket connected');
+        };
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        };
+        
+        ws.onclose = function() {
+            console.log('WebSocket disconnected');
+            // Attempt to reconnect after 5 seconds
+            setTimeout(setupWebSocket, 5000);
+        };
+        
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+        
+    } catch (error) {
+        console.error('WebSocket setup failed:', error);
+    }
+}
+
+function handleWebSocketMessage(data) {
+    if (data.type === 'server_update') {
+        // Update server data
+        const serverIndex = window.servers.findIndex(s => s.id === data.server_id);
+        if (serverIndex !== -1) {
+            window.servers[serverIndex] = { ...window.servers[serverIndex], ...data.data };
+            updateServersDisplay();
+            updateStatsDisplay();
+        }
+    } else if (data.type === 'server_added') {
+        // Add new server
+        window.servers.push(data.server);
+        updateServersDisplay();
+        updateStatsDisplay();
+    } else if (data.type === 'server_removed') {
+        // Remove server
+        window.servers = window.servers.filter(s => s.id !== data.server_id);
+        updateServersDisplay();
+        updateStatsDisplay();
+    }
+}
+
+function connectToServer(serverId) {
+    // Open terminal connection to server
+    const server = window.servers.find(s => s.id === serverId);
+    if (server) {
+        // Switch to terminal section and connect
+        document.querySelector('[data-section="terminal"]').click();
+        // Implementation for terminal connection would go here
+    }
+}
+
+function removeServer(serverId) {
+    if (confirm('Вы уверены, что хотите удалить этот сервер?')) {
+        fetch(`/api/servers/${serverId}`, {
+            method: 'DELETE',
+            headers: window.authHeaders
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadServers(); // Reload servers list
+            } else {
+                alert('Ошибка при удалении сервера');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing server:', error);
+            alert('Ошибка при удалении сервера');
+        });
+    }
+}
+
+function logout() {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+}
+
+// Global functions for HTML onclick handlers
+window.showAddServerModal = showAddServerModal;
+window.closeAddServerModal = closeAddServerModal;
+window.connectToServer = connectToServer;
+window.removeServer = removeServer;
+window.logout = logout;

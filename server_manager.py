@@ -14,6 +14,7 @@ class ServerManager:
     def __init__(self):
         self.servers = {}
         self.connections = {}
+        self.custom_actions = {}
         
     def add_server(self, name, host, port=22, username=None, password=None, key_file=None):
         """Add a new server to management"""
@@ -29,7 +30,12 @@ class ServerManager:
             'key_file': key_file,
             'status': 'disconnected',
             'added_at': datetime.now().isoformat(),
-            'last_seen': None
+            'last_seen': None,
+            'last_ping': None,
+            'cpu_usage': 0,
+            'memory_usage': 0,
+            'disk_usage': 0,
+            'network_usage': 0
         }
         
         self.servers[server_id] = server_config
@@ -42,6 +48,172 @@ class ServerManager:
     def get_server_ids(self):
         """Get list of server IDs"""
         return list(self.servers.keys())
+    
+    def remove_server(self, server_id):
+        """Remove server from management"""
+        if server_id in self.servers:
+            # Close connection if exists
+            if server_id in self.connections:
+                try:
+                    self.connections[server_id].close()
+                except:
+                    pass
+                del self.connections[server_id]
+            
+            # Remove server
+            del self.servers[server_id]
+            return True
+        return False
+    
+    def remove_agent_from_server(self, server_id):
+        """Remove agent from remote server"""
+        if server_id not in self.servers:
+            raise Exception("Server not found")
+        
+        server = self.servers[server_id]
+        
+        try:
+            # Connect to server
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if server['key_file']:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    key_filename=server['key_file']
+                )
+            else:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server['password']
+                )
+            
+            # Commands to remove agent
+            remove_commands = [
+                'sudo systemctl stop xpanel-agent || true',
+                'sudo systemctl disable xpanel-agent || true',
+                'sudo rm -f /etc/systemd/system/xpanel-agent.service',
+                'sudo rm -rf /opt/xpanel-agent',
+                'sudo systemctl daemon-reload',
+                'echo "Agent removed successfully"'
+            ]
+            
+            for cmd in remove_commands:
+                stdin, stdout, stderr = ssh.exec_command(cmd)
+                stdout.read()  # Wait for command to complete
+            
+            ssh.close()
+            
+            # Update server status
+            self.servers[server_id]['status'] = 'agent_removed'
+            self.servers[server_id]['last_ping'] = None
+            
+            return True
+            
+        except Exception as e:
+            raise Exception(f"Failed to remove agent: {str(e)}")
+    
+    def reinstall_agent_on_server(self, server_id):
+        """Reinstall agent on remote server"""
+        if server_id not in self.servers:
+            raise Exception("Server not found")
+        
+        try:
+            # First remove existing agent
+            self.remove_agent_from_server(server_id)
+            
+            # Then install new agent
+            server = self.servers[server_id]
+            result = self.install_agent_remote(
+                host=server['host'],
+                port=server['port'],
+                username=server['username'],
+                password=server['password'],
+                key_file=server['key_file']
+            )
+            
+            return result
+            
+        except Exception as e:
+            raise Exception(f"Failed to reinstall agent: {str(e)}")
+    
+    # Custom Actions Management
+    def get_custom_actions(self):
+        """Get all custom actions"""
+        return list(self.custom_actions.values())
+    
+    def create_custom_action(self, name, icon, color, command, confirm=True):
+        """Create new custom action"""
+        action_id = str(uuid.uuid4())
+        
+        action = {
+            'id': action_id,
+            'name': name,
+            'icon': icon,
+            'color': color,
+            'command': command,
+            'confirm': confirm,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        self.custom_actions[action_id] = action
+        return action_id
+    
+    def delete_custom_action(self, action_id):
+        """Delete custom action"""
+        if action_id in self.custom_actions:
+            del self.custom_actions[action_id]
+            return True
+        return False
+    
+    def execute_custom_action(self, server_id, action_id, command):
+        """Execute custom action on server"""
+        if server_id not in self.servers:
+            raise Exception("Server not found")
+        
+        if action_id not in self.custom_actions:
+            raise Exception("Action not found")
+        
+        server = self.servers[server_id]
+        
+        try:
+            # Connect to server
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if server['key_file']:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    key_filename=server['key_file']
+                )
+            else:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server['password']
+                )
+            
+            # Execute command
+            stdin, stdout, stderr = ssh.exec_command(command)
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+            
+            ssh.close()
+            
+            if error:
+                raise Exception(f"Command failed: {error}")
+            
+            return output
+            
+        except Exception as e:
+            raise Exception(f"Failed to execute action: {str(e)}")
     
     def connect_to_server(self, server_id):
         """Establish SSH connection to server"""

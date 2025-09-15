@@ -123,6 +123,92 @@ def execute_command(server_id):
     result = server_manager.execute_command(server_id, command)
     return jsonify(result)
 
+@app.route('/api/servers', methods=['GET'])
+@jwt_required()
+def get_servers():
+    """Get all servers with their status"""
+    servers = server_manager.get_all_servers()
+    return jsonify({'servers': servers})
+
+@app.route('/api/servers/<server_id>', methods=['DELETE'])
+@jwt_required()
+def delete_server(server_id):
+    """Delete server from panel"""
+    try:
+        server_manager.remove_server(server_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/servers/<server_id>/remove-agent', methods=['POST'])
+@jwt_required()
+def remove_agent(server_id):
+    """Remove agent from remote server"""
+    try:
+        result = server_manager.remove_agent_from_server(server_id)
+        return jsonify({'success': True, 'message': 'Agent removed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/servers/<server_id>/reinstall-agent', methods=['POST'])
+@jwt_required()
+def reinstall_agent(server_id):
+    """Reinstall agent on remote server"""
+    try:
+        result = server_manager.reinstall_agent_on_server(server_id)
+        return jsonify({'success': True, 'message': 'Agent reinstalled successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/custom-actions', methods=['GET'])
+@jwt_required()
+def get_custom_actions():
+    """Get all custom actions"""
+    actions = server_manager.get_custom_actions()
+    return jsonify({'actions': actions})
+
+@app.route('/api/custom-actions', methods=['POST'])
+@jwt_required()
+def create_custom_action():
+    """Create new custom action"""
+    data = request.get_json()
+    try:
+        action_id = server_manager.create_custom_action(
+            name=data.get('name'),
+            icon=data.get('icon'),
+            color=data.get('color'),
+            command=data.get('command'),
+            confirm=data.get('confirm', True)
+        )
+        return jsonify({'success': True, 'action_id': action_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/custom-actions/<action_id>', methods=['DELETE'])
+@jwt_required()
+def delete_custom_action(action_id):
+    """Delete custom action"""
+    try:
+        server_manager.delete_custom_action(action_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/execute-custom-action', methods=['POST'])
+@jwt_required()
+def execute_custom_action():
+    """Execute custom action on server"""
+    data = request.get_json()
+    try:
+        result = server_manager.execute_custom_action(
+            server_id=data.get('server_id'),
+            action_id=data.get('action_id'),
+            command=data.get('command')
+        )
+        return jsonify({'success': True, 'output': result})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @app.route('/api/servers/install-agent', methods=['POST'])
 @jwt_required()
 def install_agent():
