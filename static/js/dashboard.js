@@ -24,21 +24,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initDashboard() {
-    // Check authentication
-    const token = localStorage.getItem('token') || localStorage.getItem('xpanel_token');
-    if (!token) {
-        console.log('No token found, redirecting to login');
+    // Use new auth system
+    if (!window.xpanelAuth || !window.xpanelAuth.isAuthenticated()) {
+        console.log('Not authenticated, redirecting to login');
         window.location.href = '/login';
         return;
     }
     
-    console.log('Token found:', token ? 'Yes' : 'No');
-    
-    // Set authorization header for all requests
-    window.authHeaders = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    };
+    // Set authorization header for all requests using new auth system
+    window.authHeaders = window.xpanelAuth.getAuthHeaders();
     
     // Initialize servers array
     window.servers = [];
@@ -234,41 +228,21 @@ async function handleAutoInstall(e) {
     }
 }
 
-function loadServers() {
-    // Check if auth headers are available
-    if (!window.authHeaders) {
-        console.error('No auth headers available');
-        return;
-    }
-    
-    fetch('/api/servers', {
-        headers: window.authHeaders
-    })
-    .then(response => {
-        console.log('API Response status:', response.status);
-        if (response.status === 422 || response.status === 401) {
-            // Token expired or invalid, redirect to login
-            console.log('Token invalid, clearing and redirecting to login');
-            localStorage.removeItem('token');
-            localStorage.removeItem('xpanel_token');
-            window.location.href = '/login';
-            return;
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data) {
-            window.servers = data.servers || [];
-            updateServersDisplay();
-            updateStatsDisplay();
-        }
-    })
-    .catch(error => {
+async function loadServers() {
+    try {
+        const response = await window.xpanelAuth.apiRequest('/api/servers');
+        if (!response) return; // Auth failed, already redirected
+        
+        const data = await response.json();
+        window.servers = data.servers || [];
+        updateServersDisplay();
+        updateStatsDisplay();
+    } catch (error) {
         console.error('Error loading servers:', error);
         window.servers = [];
         updateServersDisplay();
         updateStatsDisplay();
-    });
+    }
 }
 
 function updateServersDisplay() {
@@ -663,40 +637,19 @@ async function handleAddAction(e) {
     }
 }
 
-function loadCustomActions() {
-    // Check if auth headers are available
-    if (!window.authHeaders) {
-        console.error('No auth headers available');
-        return;
-    }
-    
-    fetch('/api/custom-actions', {
-        headers: window.authHeaders
-    })
-    .then(response => {
-        console.log('API Response status:', response.status);
-        if (response.status === 422 || response.status === 401) {
-            // Token expired or invalid, redirect to login
-            console.log('Token invalid, clearing and redirecting to login');
-            localStorage.removeItem('token');
-            localStorage.removeItem('xpanel_token');
-            window.location.href = '/login';
-            return;
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data) {
-            window.customActions = data.actions || [];
-            updateCustomActionsDisplay();
-            updateServersDisplay(); // Update server table with new actions
-        }
-    })
-    .catch(error => {
+async function loadCustomActions() {
+    try {
+        const response = await window.xpanelAuth.apiRequest('/api/custom-actions');
+        if (!response) return; // Auth failed, already redirected
+        
+        const data = await response.json();
+        window.customActions = data.actions || [];
+        updateCustomActionsDisplay();
+    } catch (error) {
         console.error('Error loading custom actions:', error);
         window.customActions = [];
         updateCustomActionsDisplay();
-    });
+    }
 }
 
 function updateCustomActionsDisplay() {

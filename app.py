@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 import bcrypt
 from server_manager import ServerManager
 from agent_client import AgentClient
+from auth import auth_bp, require_auth, get_current_user
 
 # Load environment variables
 load_dotenv()
@@ -32,17 +33,12 @@ jwt = JWTManager(app)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
+# Register authentication blueprint
+app.register_blueprint(auth_bp)
+
 # Initialize managers
 server_manager = ServerManager()
 agent_client = AgentClient()
-
-# In-memory user storage (replace with database in production)
-users_db = {
-    'admin': {
-        'password': bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()),
-        'role': 'admin'
-    }
-}
 
 @app.route('/')
 def index():
@@ -58,33 +54,20 @@ def dashboard():
 
 @app.route('/login')
 def login_page():
-    return render_template('login.html')
+    return render_template('login_new.html')
 
 @app.route('/login/ru')
 def login_page_ru():
     return render_template('login_ru.html')
 
+# Legacy login endpoint - redirect to new auth system
 @app.route('/api/login', methods=['POST'])
-def login():
-    """User authentication endpoint"""
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    
-    if username in users_db:
-        stored_password = users_db[username]['password']
-        if bcrypt.checkpw(password.encode('utf-8'), stored_password):
-            access_token = create_access_token(identity=username)
-            return jsonify({
-                'success': True,
-                'access_token': access_token,
-                'user': {
-                    'username': username,
-                    'role': users_db[username]['role']
-                }
-            })
-    
-    return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+def legacy_login():
+    """Legacy login endpoint - redirects to new auth system"""
+    from auth import auth_bp
+    # Import the login function from the auth blueprint
+    with app.app_context():
+        return auth_bp.view_functions['login']()
 
 @app.route('/api/servers', methods=['GET'])
 @jwt_required()

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход - Xpanel</title>
+    <link rel="stylesheet" href="/static/css/auth.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo">
+                    <i class="fas fa-server"></i>
+                    <h1>Xpanel</h1>
+                </div>
+                <p>Войдите в панель управления</p>
+            </div>
+
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i>
+                        Логин
+                    </label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i>
+                        Пароль
+                    </label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="auth-btn" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Войти
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+        </div>
+
+        <!-- Registration Form (Hidden by default) -->
+        <div class="auth-card" id="registerCard" style="display: none;">
+            <div class="auth-header">
+                <div class="logo">
+                    <i class="fas fa-server"></i>
+                    <h1>Xpanel</h1>
+                </div>
+                <p>Создать новый аккаунт</p>
+            </div>
+
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label for="regUsername">
+                        <i class="fas fa-user"></i>
+                        Логин
+                    </label>
+                    <input type="text" id="regUsername" name="username" required minlength="3">
+                    <small>Минимум 3 символа</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="regPassword">
+                        <i class="fas fa-lock"></i>
+                        Пароль
+                    </label>
+                    <input type="password" id="regPassword" name="password" required minlength="6">
+                    <small>Минимум 6 символов</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="regRole">
+                        <i class="fas fa-user-tag"></i>
+                        Роль
+                    </label>
+                    <select id="regRole" name="role">
+                        <option value="user">Пользователь</option>
+                        <option value="admin">Администратор</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="auth-btn" id="registerBtn">
+                    <i class="fas fa-user-plus"></i>
+                    Зарегистрироваться
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+
+            // Login form handler
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const loginBtn = document.getElementById('loginBtn');
+                
+                // Show loading state
+                loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
+                loginBtn.disabled = true;
+                hideMessages();
+
+                try {
+                    const result = await xpanelAuth.login(username, password);
+                    
+                    if (result.success) {
+                        showSuccess('Успешный вход! Перенаправление...');
+                        setTimeout(() => {
+                            window.location.href = '/dashboard';
+                        }, 1000);
+                    }
+                } catch (error) {
+                    showError(error.message || 'Ошибка входа');
+                } finally {
+                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Войти';
+                    loginBtn.disabled = false;
+                }
+            });
+
+            // Register form handler
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const username = document.getElementById('regUsername').value;
+                const password = document.getElementById('regPassword').value;
+                const role = document.getElementById('regRole').value;
+                const registerBtn = document.getElementById('registerBtn');
+                
+                // Show loading state
+                registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Регистрация...';
+                registerBtn.disabled = true;
+                hideMessages();
+
+                try {
+                    const result = await xpanelAuth.register(username, password, role);
+                    
+                    if (result.success) {
+                        showSuccess('Регистрация успешна! Теперь войдите в систему.');
+                        setTimeout(() => {
+                            showLoginForm();
+                            document.getElementById('username').value = username;
+                        }, 1500);
+                    }
+                } catch (error) {
+                    showError(error.message || 'Ошибка регистрации');
+                } finally {
+                    registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Зарегистрироваться';
+                    registerBtn.disabled = false;
+                }
+            });
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                successMessage.style.display = 'none';
+            }
+
+            function showSuccess(message) {
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+            }
+
+            function hideMessages() {
+                errorMessage.style.display = 'none';
+                successMessage.style.display = 'none';
+            }
+
+            // Global functions for form switching
+            window.showRegisterForm = function() {
+                document.querySelector('.auth-card:first-child').style.display = 'none';
+                document.getElementById('registerCard').style.display = 'block';
+                hideMessages();
+            };
+
+            window.showLoginForm = function() {
+                document.querySelector('.auth-card:first-child').style.display = 'block';
+                document.getElementById('registerCard').style.display = 'none';
+                hideMessages();
+            };
+
+            // Check if already authenticated
+            if (xpanelAuth.isAuthenticated()) {
+                window.location.href = '/dashboard';
+            }
+        });
+    </script>
+</body>
+</html>
