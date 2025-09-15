@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xpanel - Professional VPS Management</title>
+    <title>Xpanel - Профессиональное управление VPS</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Navigation -->
+    <!-- Навигация -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
@@ -17,14 +17,14 @@
                 <span class="brand-text">Xpanel</span>
             </div>
             <div class="nav-menu">
-                <a href="#features" class="nav-link">Features</a>
-                <a href="#pricing" class="nav-link">Pricing</a>
-                <a href="#about" class="nav-link">About</a>
+                <a href="#features" class="nav-link">Возможности</a>
+                <a href="#pricing" class="nav-link">Цены</a>
+                <a href="#about" class="nav-link">О нас</a>
                 <div class="language-switcher">
-                    <button class="lang-btn" onclick="switchLanguage('ru')">РУС</button>
-                    <button class="lang-btn active" onclick="switchLanguage('en')">ENG</button>
+                    <button class="lang-btn active" onclick="switchLanguage('ru')">РУС</button>
+                    <button class="lang-btn" onclick="switchLanguage('en')">ENG</button>
                 </div>
-                <a href="/login" class="nav-link login-btn">Login</a>
+                <a href="/login" class="nav-link login-btn">Войти</a>
             </div>
             <div class="hamburger">
                 <span></span>
@@ -34,27 +34,27 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
+    <!-- Главная секция -->
     <section class="hero">
         <div class="hero-container">
             <div class="hero-content">
                 <h1 class="hero-title">
-                    Professional VPS Management
-                    <span class="gradient-text">Made Simple</span>
+                    Профессиональное управление VPS
+                    <span class="gradient-text">стало простым</span>
                 </h1>
                 <p class="hero-description">
-                    Monitor, manage, and control your Linux VPS servers with our powerful, 
-                    intuitive web-based control panel. Real-time monitoring, terminal access, 
-                    file management, and automated deployment tools.
+                    Мониторьте, управляйте и контролируйте ваши Linux VPS серверы с помощью нашей 
+                    мощной, интуитивной веб-панели управления. Мониторинг в реальном времени, доступ к терминалу, 
+                    управление файлами и автоматизированные инструменты развертывания.
                 </p>
                 <div class="hero-buttons">
                     <a href="/login" class="btn btn-primary">
                         <i class="fas fa-rocket"></i>
-                        Get Started
+                        Начать работу
                     </a>
                     <a href="#features" class="btn btn-secondary">
                         <i class="fas fa-play"></i>
-                        Learn More
+                        Узнать больше
                     </a>
                 </div>
             </div>
@@ -75,7 +75,7 @@
                                 </div>
                                 <div class="stat-info">
                                     <span class="stat-value">45%</span>
-                                    <span class="stat-label">CPU</span>
+                                    <span class="stat-label">ЦПУ</span>
                                 </div>
                             </div>
                             <div class="stat-card">
@@ -83,8 +83,8 @@
                                     <i class="fas fa-memory"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value">2.1GB</span>
-                                    <span class="stat-label">RAM</span>
+                                    <span class="stat-value">2.1ГБ</span>
+                                    <span class="stat-label">ОЗУ</span>
                                 </div>
                             </div>
                             <div class="stat-card">
@@ -93,7 +93,7 @@
                                 </div>
                                 <div class="stat-info">
                                     <span class="stat-value">67%</span>
-                                    <span class="stat-label">Disk</span>
+                                    <span class="stat-label">Диск</span>
                                 </div>
                             </div>
                         </div>
@@ -107,10 +107,10 @@
                                     <span class="command">systemctl status nginx</span>
                                 </div>
                                 <div class="terminal-line">
-                                    <span class="output">● nginx.service - A high performance web server</span>
+                                    <span class="output">● nginx.service - Высокопроизводительный веб-сервер</span>
                                 </div>
                                 <div class="terminal-line">
-                                    <span class="output success">   Active: active (running)</span>
+                                    <span class="output success">   Статус: активен (запущен)</span>
                                 </div>
                             </div>
                         </div>
@@ -125,171 +125,170 @@
         </div>
     </section>
 
-    <!-- Features Section -->
+    <!-- Секция возможностей -->
     <section id="features" class="features">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Powerful Features</h2>
-                <p class="section-description">Everything you need to manage your VPS infrastructure</p>
+                <h2 class="section-title">Мощные возможности</h2>
+                <p class="section-description">Все что нужно для управления вашей VPS инфраструктурой</p>
             </div>
             <div class="features-grid">
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
                     <div class="feature-icon">
                         <i class="fas fa-chart-line"></i>
                     </div>
-                    <h3 class="feature-title">Real-time Monitoring</h3>
+                    <h3 class="feature-title">Мониторинг в реальном времени</h3>
                     <p class="feature-description">
-                        Monitor CPU, RAM, disk usage, and network activity in real-time with 
-                        beautiful charts and instant alerts.
+                        Отслеживайте использование ЦПУ, ОЗУ, диска и сетевой активности в реальном времени 
+                        с красивыми графиками и мгновенными уведомлениями.
                     </p>
                 </div>
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
                     <div class="feature-icon">
                         <i class="fas fa-terminal"></i>
                     </div>
-                    <h3 class="feature-title">Web Terminal</h3>
+                    <h3 class="feature-title">Веб-терминал</h3>
                     <p class="feature-description">
-                        Access your server's command line directly from your browser with 
-                        our secure, full-featured web terminal.
+                        Получите доступ к командной строке вашего сервера прямо из браузера с помощью 
+                        нашего безопасного, полнофункционального веб-терминала.
                     </p>
                 </div>
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
                     <div class="feature-icon">
                         <i class="fas fa-folder-open"></i>
                     </div>
-                    <h3 class="feature-title">File Manager</h3>
+                    <h3 class="feature-title">Файловый менеджер</h3>
                     <p class="feature-description">
-                        Upload, download, edit, and manage files with our intuitive 
-                        web-based file manager interface.
+                        Загружайте, скачивайте, редактируйте и управляйте файлами с помощью нашего 
+                        интуитивного веб-интерфейса файлового менеджера.
                     </p>
                 </div>
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
                     <div class="feature-icon">
                         <i class="fas fa-magic"></i>
                     </div>
-                    <h3 class="feature-title">Auto Installation</h3>
+                    <h3 class="feature-title">Автоустановка</h3>
                     <p class="feature-description">
-                        Automatically install and configure agents on remote servers 
-                        via SSH with one-click deployment.
+                        Автоматически устанавливайте и настраивайте агенты на удаленных серверах 
+                        через SSH одним кликом.
                     </p>
                 </div>
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
                     <div class="feature-icon">
                         <i class="fas fa-shield-alt"></i>
                     </div>
-                    <h3 class="feature-title">Secure Access</h3>
+                    <h3 class="feature-title">Безопасный доступ</h3>
                     <p class="feature-description">
-                        Enterprise-grade security with JWT authentication, encrypted 
-                        connections, and role-based access control.
+                        Корпоративная безопасность с JWT аутентификацией, зашифрованными 
+                        соединениями и контролем доступа на основе ролей.
                     </p>
                 </div>
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="600">
                     <div class="feature-icon">
                         <i class="fas fa-mobile-alt"></i>
                     </div>
-                    <h3 class="feature-title">Mobile Responsive</h3>
+                    <h3 class="feature-title">Адаптивный дизайн</h3>
                     <p class="feature-description">
-                        Manage your servers from anywhere with our fully responsive 
-                        design that works on all devices.
+                        Управляйте серверами из любого места с нашим полностью адаптивным 
+                        дизайном, который работает на всех устройствах.
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Pricing Section -->
+    <!-- Секция цен -->
     <section id="pricing" class="pricing">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Simple Pricing</h2>
-                <p class="section-description">Choose the plan that fits your needs</p>
+                <h2 class="section-title">Простые цены</h2>
+                <p class="section-description">Выберите тариф, который подходит вашим потребностям</p>
             </div>
             <div class="pricing-grid">
                 <div class="pricing-card" data-aos="fade-up" data-aos-delay="100">
                     <div class="pricing-header">
-                        <h3 class="plan-name">Starter</h3>
+                        <h3 class="plan-name">Начальный</h3>
                         <div class="plan-price">
-                            <span class="currency">$</span>
-                            <span class="amount">9</span>
-                            <span class="period">/month</span>
+                            <span class="currency">₽</span>
+                            <span class="amount">690</span>
+                            <span class="period">/месяц</span>
                         </div>
                     </div>
                     <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> Up to 3 servers</li>
-                        <li><i class="fas fa-check"></i> Real-time monitoring</li>
-                        <li><i class="fas fa-check"></i> Web terminal access</li>
-                        <li><i class="fas fa-check"></i> File manager</li>
-                        <li><i class="fas fa-check"></i> Email support</li>
+                        <li><i class="fas fa-check"></i> До 3 серверов</li>
+                        <li><i class="fas fa-check"></i> Мониторинг в реальном времени</li>
+                        <li><i class="fas fa-check"></i> Доступ к веб-терминалу</li>
+                        <li><i class="fas fa-check"></i> Файловый менеджер</li>
+                        <li><i class="fas fa-check"></i> Поддержка по email</li>
                     </ul>
-                    <button class="plan-button">Get Started</button>
+                    <button class="plan-button">Начать</button>
                 </div>
                 <div class="pricing-card featured" data-aos="fade-up" data-aos-delay="200">
-                    <div class="featured-badge">Most Popular</div>
+                    <div class="featured-badge">Популярный</div>
                     <div class="pricing-header">
-                        <h3 class="plan-name">Professional</h3>
+                        <h3 class="plan-name">Профессиональный</h3>
                         <div class="plan-price">
-                            <span class="currency">$</span>
-                            <span class="amount">29</span>
-                            <span class="period">/month</span>
+                            <span class="currency">₽</span>
+                            <span class="amount">2190</span>
+                            <span class="period">/месяц</span>
                         </div>
                     </div>
                     <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> Up to 15 servers</li>
-                        <li><i class="fas fa-check"></i> Advanced monitoring</li>
-                        <li><i class="fas fa-check"></i> Auto-installation</li>
-                        <li><i class="fas fa-check"></i> API access</li>
-                        <li><i class="fas fa-check"></i> Priority support</li>
-                        <li><i class="fas fa-check"></i> Custom alerts</li>
+                        <li><i class="fas fa-check"></i> До 15 серверов</li>
+                        <li><i class="fas fa-check"></i> Расширенный мониторинг</li>
+                        <li><i class="fas fa-check"></i> Автоустановка</li>
+                        <li><i class="fas fa-check"></i> Доступ к API</li>
+                        <li><i class="fas fa-check"></i> Приоритетная поддержка</li>
+                        <li><i class="fas fa-check"></i> Настраиваемые уведомления</li>
                     </ul>
-                    <button class="plan-button">Get Started</button>
+                    <button class="plan-button">Начать</button>
                 </div>
                 <div class="pricing-card" data-aos="fade-up" data-aos-delay="300">
                     <div class="pricing-header">
-                        <h3 class="plan-name">Enterprise</h3>
+                        <h3 class="plan-name">Корпоративный</h3>
                         <div class="plan-price">
-                            <span class="currency">$</span>
-                            <span class="amount">99</span>
-                            <span class="period">/month</span>
+                            <span class="currency">₽</span>
+                            <span class="amount">7490</span>
+                            <span class="period">/месяц</span>
                         </div>
                     </div>
                     <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> Unlimited servers</li>
-                        <li><i class="fas fa-check"></i> White-label solution</li>
-                        <li><i class="fas fa-check"></i> Custom integrations</li>
-                        <li><i class="fas fa-check"></i> Dedicated support</li>
-                        <li><i class="fas fa-check"></i> SLA guarantee</li>
-                        <li><i class="fas fa-check"></i> On-premise deployment</li>
+                        <li><i class="fas fa-check"></i> Неограниченно серверов</li>
+                        <li><i class="fas fa-check"></i> White-label решение</li>
+                        <li><i class="fas fa-check"></i> Пользовательские интеграции</li>
+                        <li><i class="fas fa-check"></i> Выделенная поддержка</li>
+                        <li><i class="fas fa-check"></i> Гарантия SLA</li>
+                        <li><i class="fas fa-check"></i> Локальное развертывание</li>
                     </ul>
-                    <button class="plan-button">Contact Sales</button>
+                    <button class="plan-button">Связаться с отделом продаж</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- About Section -->
+    <!-- Секция о нас -->
     <section id="about" class="about">
         <div class="container">
             <div class="about-content">
                 <div class="about-text" data-aos="fade-right">
-                    <h2 class="section-title">Why Choose Xpanel?</h2>
+                    <h2 class="section-title">Почему выбирают Xpanel?</h2>
                     <p class="about-description">
-                        Xpanel is built by system administrators, for system administrators. 
-                        We understand the challenges of managing multiple VPS servers and 
-                        have created a solution that simplifies your workflow while providing 
-                        enterprise-grade features.
+                        Xpanel создан системными администраторами для системных администраторов. 
+                        Мы понимаем проблемы управления множественными VPS серверами и создали 
+                        решение, которое упрощает ваш рабочий процесс, предоставляя функции корпоративного уровня.
                     </p>
                     <div class="about-stats">
                         <div class="stat">
                             <span class="stat-number">10,000+</span>
-                            <span class="stat-label">Servers Managed</span>
+                            <span class="stat-label">Управляемых серверов</span>
                         </div>
                         <div class="stat">
                             <span class="stat-number">99.9%</span>
-                            <span class="stat-label">Uptime</span>
+                            <span class="stat-label">Время работы</span>
                         </div>
                         <div class="stat">
                             <span class="stat-number">24/7</span>
-                            <span class="stat-label">Support</span>
+                            <span class="stat-label">Поддержка</span>
                         </div>
                     </div>
                 </div>
@@ -325,7 +324,7 @@
         </div>
     </section>
 
-    <!-- Footer -->
+    <!-- Подвал -->
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -335,32 +334,32 @@
                         <span class="brand-text">Xpanel</span>
                     </div>
                     <p class="footer-description">
-                        Professional VPS management made simple and secure.
+                        Профессиональное управление VPS стало простым и безопасным.
                     </p>
                 </div>
                 <div class="footer-links">
                     <div class="link-group">
-                        <h4>Product</h4>
-                        <a href="#features">Features</a>
-                        <a href="#pricing">Pricing</a>
-                        <a href="/login">Login</a>
+                        <h4>Продукт</h4>
+                        <a href="#features">Возможности</a>
+                        <a href="#pricing">Цены</a>
+                        <a href="/login">Войти</a>
                     </div>
                     <div class="link-group">
-                        <h4>Support</h4>
-                        <a href="#">Documentation</a>
-                        <a href="#">Help Center</a>
-                        <a href="#">Contact</a>
+                        <h4>Поддержка</h4>
+                        <a href="#">Документация</a>
+                        <a href="#">Центр помощи</a>
+                        <a href="#">Контакты</a>
                     </div>
                     <div class="link-group">
-                        <h4>Company</h4>
-                        <a href="#about">About</a>
-                        <a href="#">Blog</a>
-                        <a href="#">Careers</a>
+                        <h4>Компания</h4>
+                        <a href="#about">О нас</a>
+                        <a href="#">Блог</a>
+                        <a href="#">Карьера</a>
                     </div>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2024 Xpanel. All rights reserved.</p>
+                <p>&copy; 2024 Xpanel. Все права защищены.</p>
                 <div class="social-links">
                     <a href="#"><i class="fab fa-twitter"></i></a>
                     <a href="#"><i class="fab fa-github"></i></a>
@@ -378,6 +377,14 @@
             easing: 'ease-in-out',
             once: true
         });
+
+        function switchLanguage(lang) {
+            if (lang === 'en') {
+                window.location.href = '/';
+            } else {
+                window.location.href = '/ru';
+            }
+        }
     </script>
 </body>
 </html>

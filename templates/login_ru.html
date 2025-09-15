@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xpanel - Login</title>
+    <title>Xpanel - Вход в систему</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -23,26 +23,31 @@
                         <i class="fas fa-server brand-icon"></i>
                         <span class="brand-text">Xpanel</span>
                     </div>
-                    <h1 class="auth-title">Welcome Back</h1>
-                    <p class="auth-subtitle">Sign in to your VPS management panel</p>
+                    <h1 class="auth-title">Добро пожаловать</h1>
+                    <p class="auth-subtitle">Войдите в панель управления VPS</p>
+                </div>
+                
+                <div class="language-switcher-auth">
+                    <button class="lang-btn active" onclick="switchLanguage('ru')">РУС</button>
+                    <button class="lang-btn" onclick="switchLanguage('en')">ENG</button>
                 </div>
                 
                 <form id="loginForm" class="auth-form">
                     <div class="form-group">
                         <label for="username" class="form-label">
                             <i class="fas fa-user"></i>
-                            Username
+                            Имя пользователя
                         </label>
-                        <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required>
+                        <input type="text" id="username" name="username" class="form-input" placeholder="Введите имя пользователя" required>
                     </div>
                     
                     <div class="form-group">
                         <label for="password" class="form-label">
                             <i class="fas fa-lock"></i>
-                            Password
+                            Пароль
                         </label>
                         <div class="password-input">
-                            <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
+                            <input type="password" id="password" name="password" class="form-input" placeholder="Введите пароль" required>
                             <button type="button" class="password-toggle" onclick="togglePassword()">
                                 <i class="fas fa-eye" id="passwordIcon"></i>
                             </button>
@@ -53,13 +58,13 @@
                         <label class="checkbox-container">
                             <input type="checkbox" id="remember">
                             <span class="checkmark"></span>
-                            Remember me
+                            Запомнить меня
                         </label>
-                        <a href="#" class="forgot-password">Forgot password?</a>
+                        <a href="#" class="forgot-password">Забыли пароль?</a>
                     </div>
                     
                     <button type="submit" class="auth-button">
-                        <span class="button-text">Sign In</span>
+                        <span class="button-text">Войти</span>
                         <i class="fas fa-arrow-right button-icon"></i>
                         <div class="button-loader" style="display: none;">
                             <i class="fas fa-spinner fa-spin"></i>
@@ -73,7 +78,7 @@
                 </div>
                 
                 <div class="auth-footer">
-                    <p>Don't have an account? <a href="/" class="auth-link">Learn more about Xpanel</a></p>
+                    <p>Нет аккаунта? <a href="/ru" class="auth-link">Узнать больше о Xpanel</a></p>
                 </div>
             </div>
         </div>
@@ -90,6 +95,14 @@
             } else {
                 passwordInput.type = 'password';
                 passwordIcon.className = 'fas fa-eye';
+            }
+        }
+        
+        function switchLanguage(lang) {
+            if (lang === 'en') {
+                window.location.href = '/login';
+            } else {
+                window.location.href = '/login/ru';
             }
         }
         
@@ -134,7 +147,7 @@
                         window.location.href = '/dashboard';
                     }, 1000);
                 } else {
-                    throw new Error(data.message || 'Login failed');
+                    throw new Error(data.message || 'Ошибка входа');
                 }
             } catch (error) {
                 // Reset button state
@@ -146,7 +159,11 @@
                 button.classList.remove('success');
                 
                 // Show error
-                errorText.textContent = error.message || 'Network error. Please try again.';
+                let errorMessage = error.message || 'Ошибка сети. Попробуйте еще раз.';
+                if (errorMessage.includes('Login failed') || errorMessage.includes('Invalid')) {
+                    errorMessage = 'Неверное имя пользователя или пароль';
+                }
+                errorText.textContent = errorMessage;
                 errorDiv.style.display = 'flex';
                 
                 // Shake animation

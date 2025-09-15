@@ -295,23 +295,6 @@ style.textContent = `
         }
     }
     
-    .tech-item {
-        animation: fadeInScale 0.6s ease-out both;
-    }
-    
-    @keyframes fadeInScale {
-        from {
-            opacity: 0;
-            transform: scale(0.8);
-        }
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
-    }
-    
-    @media (max-width: 768px) {
-        .nav-menu.active {
             display: flex;
             position: absolute;
             top: 100%;

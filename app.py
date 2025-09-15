@@ -48,6 +48,10 @@ users_db = {
 def index():
     return render_template('landing.html')
 
+@app.route('/ru')
+def index_ru():
+    return render_template('landing_ru.html')
+
 @app.route('/dashboard')
 def dashboard():
     return render_template('index.html')
@@ -55,6 +59,10 @@ def dashboard():
 @app.route('/login')
 def login_page():
     return render_template('login.html')
+
+@app.route('/login/ru')
+def login_page_ru():
+    return render_template('login_ru.html')
 
 @app.route('/api/login', methods=['POST'])
 def login():

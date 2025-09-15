@@ -467,6 +467,41 @@ body {
     height: 300px;
 }
 
+/* Language switcher for auth page */
+.language-switcher-auth {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    padding: 0.25rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.lang-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.875rem;
+}
+
+.lang-btn.active {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.lang-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--primary-color);
+}
+
 /* Glass morphism effect */
 .auth-card {
     background: rgba(255, 255, 255, 0.25);
