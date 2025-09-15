@@ -432,6 +432,64 @@ class ServerManager:
                 'success': False,
                 'error': f'SSH connection failed: {str(e)}'
             }
+    
+    def get_server_stats(self, server_id):
+        """Get server statistics"""
+        if server_id not in self.servers:
+            return {'error': 'Server not found'}
+        
+        # Return mock stats for now
+        return {
+            'cpu_usage': 25.5,
+            'memory_usage': 67.2,
+            'disk_usage': 45.8,
+            'network_rx': 1024,
+            'network_tx': 2048,
+            'uptime': '5 days, 12:34:56'
+        }
+    
+    def execute_command(self, server_id, command):
+        """Execute command on server"""
+        if server_id not in self.servers:
+            return {'success': False, 'error': 'Server not found'}
+        
+        server = self.servers[server_id]
+        
+        try:
+            # Connect to server
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if server['key_file']:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    key_filename=server['key_file']
+                )
+            else:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server['password']
+                )
+            
+            # Execute command
+            stdin, stdout, stderr = ssh.exec_command(command)
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+            
+            ssh.close()
+            
+            return {
+                'success': True,
+                'output': output,
+                'error': error if error else None
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def generate_install_script(self, panel_address):
         """Generate agent installation script"""

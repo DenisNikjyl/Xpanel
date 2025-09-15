@@ -70,7 +70,8 @@ class XpanelAPI {
 
     // Server management
     async getServers() {
-        return this.request('/servers');
+        const response = await this.request('/servers');
+        return response.servers || [];
     }
 
     async addServer(serverData) {
@@ -98,6 +99,49 @@ class XpanelAPI {
     async removeServer(serverId) {
         return this.request(`/servers/${serverId}`, {
             method: 'DELETE'
+        });
+    }
+
+    // Custom actions
+    async getCustomActions() {
+        const response = await this.request('/custom-actions');
+        return response.actions || [];
+    }
+
+    async createCustomAction(actionData) {
+        return this.request('/custom-actions', {
+            method: 'POST',
+            body: JSON.stringify(actionData)
+        });
+    }
+
+    async deleteCustomAction(actionId) {
+        return this.request(`/custom-actions/${actionId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    async executeCustomAction(serverId, actionId, command) {
+        return this.request('/custom-actions/execute', {
+            method: 'POST',
+            body: JSON.stringify({
+                server_id: serverId,
+                action_id: actionId,
+                command: command
+            })
+        });
+    }
+
+    // Agent management
+    async removeAgent(serverId) {
+        return this.request(`/servers/${serverId}/remove-agent`, {
+            method: 'POST'
+        });
+    }
+
+    async reinstallAgent(serverId) {
+        return this.request(`/servers/${serverId}/reinstall-agent`, {
+            method: 'POST'
         });
     }
 }

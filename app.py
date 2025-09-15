@@ -392,4 +392,4 @@ if __name__ == '__main__':
     
     # Run the application
     port = int(os.getenv('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True)
