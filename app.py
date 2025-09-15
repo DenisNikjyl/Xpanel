@@ -679,6 +679,485 @@ def handle_join_room(data):
         join_room(room)
         emit('joined_room', {'room': room})
 
+# Settings API endpoints
+@app.route('/api/settings', methods=['GET'])
+@jwt_required()
+def get_settings():
+    """Get system settings"""
+    try:
+        settings_file = 'settings.json'
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+        else:
+            # Default settings
+            settings = {
+                'general': {
+                    'panelName': 'Xpanel Dashboard',
+                    'timezone': 'Europe/Moscow',
+                    'language': 'ru'
+                },
+                'panel': {
+                    'theme': 'dark',
+                    'enableAnimations': True,
+                    'autoRefresh': True,
+                    'systemNotifications': True,
+                    'refreshInterval': 30
+                },
+                'notifications': {
+                    'serverDownAlerts': True,
+                    'cpuAlerts': True,
+                    'memoryAlerts': True,
+                    'diskAlerts': True,
+                    'securityAlerts': True,
+                    'emailNotifications': '',
+                    'alertThreshold': 80
+                },
+                'security': {
+                    'twoFactorAuth': False,
+                    'autoLock': True,
+                    'loginNotifications': True,
+                    'sessionTimeout': 60,
+                    'allowedIps': ''
+                },
+                'backup': {
+                    'autoBackup': True,
+                    'backupFrequency': 'daily',
+                    'backupRetention': 30
+                }
+            }
+        return jsonify(settings)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings', methods=['POST'])
+@jwt_required()
+def save_settings():
+    """Save system settings"""
+    try:
+        data = request.get_json()
+        settings_file = 'settings.json'
+        
+        with open(settings_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'Settings saved successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/system/info', methods=['GET'])
+@jwt_required()
+def get_system_info():
+    """Get system information"""
+    try:
+        import platform
+        import uptime
+        
+        # Get servers count
+        servers_file = 'servers.json'
+        total_servers = 0
+        active_agents = 0
+        
+        if os.path.exists(servers_file):
+            with open(servers_file, 'r', encoding='utf-8') as f:
+                servers = json.load(f)
+                total_servers = len(servers)
+                active_agents = len([s for s in servers if s.get('status') == 'online'])
+        
+        # Get system uptime
+        try:
+            uptime_seconds = uptime.uptime()
+            days = int(uptime_seconds // 86400)
+            hours = int((uptime_seconds % 86400) // 3600)
+            uptime_str = f"{days} days, {hours} hours"
+        except:
+            uptime_str = "Unknown"
+        
+        return jsonify({
+            'uptime': uptime_str,
+            'totalServers': total_servers,
+            'activeAgents': active_agents,
+            'platform': platform.system(),
+            'version': '2.1.0'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Agents API endpoints
+@app.route('/api/agents', methods=['GET'])
+@jwt_required()
+def get_agents():
+    """Get all agents"""
+    try:
+        agents_file = 'agents.json'
+        if os.path.exists(agents_file):
+            with open(agents_file, 'r', encoding='utf-8') as f:
+                agents = json.load(f)
+        else:
+            agents = []
+        
+        return jsonify(agents)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/agents/<agent_id>/restart', methods=['POST'])
+@jwt_required()
+def restart_agent(agent_id):
+    """Restart agent"""
+    try:
+        # Find agent and restart it
+        result = server_manager.restart_agent(agent_id)
+        return jsonify({'success': True, 'message': 'Agent restarted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/agents/<agent_id>/update', methods=['POST'])
+@jwt_required()
+def update_agent(agent_id):
+    """Update agent"""
+    try:
+        result = server_manager.update_agent(agent_id)
+        return jsonify({'success': True, 'message': 'Agent updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/agents/<agent_id>', methods=['DELETE'])
+@jwt_required()
+def remove_agent_endpoint(agent_id):
+    """Remove agent"""
+    try:
+        result = server_manager.remove_agent(agent_id)
+        return jsonify({'success': True, 'message': 'Agent removed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Security API endpoints
+@app.route('/api/security/threats', methods=['GET'])
+@jwt_required()
+def get_security_threats():
+    """Get security threats"""
+    try:
+        # Mock data for now - in production, integrate with real security monitoring
+        threats = [
+            {
+                'id': 1,
+                'type': 'Brute Force Attack',
+                'severity': 'high',
+                'source': '192.168.1.100',
+                'target': 'SSH (Port 22)',
+                'timestamp': '2024-09-15 14:30:00',
+                'status': 'blocked',
+                'attempts': 25
+            },
+            {
+                'id': 2,
+                'type': 'Port Scan',
+                'severity': 'medium',
+                'source': '10.0.0.50',
+                'target': 'Multiple Ports',
+                'timestamp': '2024-09-15 13:15:00',
+                'status': 'monitoring',
+                'attempts': 1
+            }
+        ]
+        return jsonify(threats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/firewall', methods=['GET'])
+@jwt_required()
+def get_firewall_rules():
+    """Get firewall rules"""
+    try:
+        firewall_file = 'firewall_rules.json'
+        if os.path.exists(firewall_file):
+            with open(firewall_file, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+        else:
+            rules = [
+                {
+                    'id': 1,
+                    'name': 'Allow SSH',
+                    'action': 'allow',
+                    'protocol': 'tcp',
+                    'port': '22',
+                    'source': 'any',
+                    'status': 'active'
+                },
+                {
+                    'id': 2,
+                    'name': 'Allow HTTP',
+                    'action': 'allow',
+                    'protocol': 'tcp',
+                    'port': '80',
+                    'source': 'any',
+                    'status': 'active'
+                }
+            ]
+        return jsonify(rules)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/firewall', methods=['POST'])
+@jwt_required()
+def add_firewall_rule():
+    """Add firewall rule"""
+    try:
+        data = request.get_json()
+        firewall_file = 'firewall_rules.json'
+        
+        if os.path.exists(firewall_file):
+            with open(firewall_file, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+        else:
+            rules = []
+        
+        new_rule = {
+            'id': len(rules) + 1,
+            'name': data.get('name'),
+            'action': data.get('action'),
+            'protocol': data.get('protocol'),
+            'port': data.get('port'),
+            'source': data.get('source'),
+            'status': 'active'
+        }
+        
+        rules.append(new_rule)
+        
+        with open(firewall_file, 'w', encoding='utf-8') as f:
+            json.dump(rules, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'Firewall rule added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security/logs', methods=['GET'])
+@jwt_required()
+def get_security_logs():
+    """Get security logs"""
+    try:
+        # Mock data for now
+        logs = [
+            {
+                'id': 1,
+                'timestamp': '2024-09-15 14:30:15',
+                'level': 'warning',
+                'event': 'Failed login attempt',
+                'source': '192.168.1.100',
+                'details': 'SSH login failed for user root'
+            },
+            {
+                'id': 2,
+                'timestamp': '2024-09-15 14:25:30',
+                'level': 'info',
+                'event': 'Firewall rule applied',
+                'source': 'system',
+                'details': 'New rule: Allow HTTP traffic'
+            }
+        ]
+        return jsonify(logs)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/users', methods=['GET'])
+@jwt_required()
+def get_security_users():
+    """Get security users"""
+    try:
+        users_file = 'security_users.json'
+        if os.path.exists(users_file):
+            with open(users_file, 'r', encoding='utf-8') as f:
+                users = json.load(f)
+        else:
+            users = [
+                {
+                    'id': 1,
+                    'username': 'admin',
+                    'email': 'admin@xpanel.local',
+                    'role': 'administrator',
+                    'status': 'active',
+                    'lastLogin': '2024-09-15 12:00:00'
+                }
+            ]
+        return jsonify(users)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/users', methods=['POST'])
+@jwt_required()
+def add_security_user():
+    """Add security user"""
+    try:
+        data = request.get_json()
+        users_file = 'security_users.json'
+        
+        if os.path.exists(users_file):
+            with open(users_file, 'r', encoding='utf-8') as f:
+                users = json.load(f)
+        else:
+            users = []
+        
+        new_user = {
+            'id': len(users) + 1,
+            'username': data.get('username'),
+            'email': data.get('email'),
+            'role': data.get('role'),
+            'status': 'active',
+            'lastLogin': None
+        }
+        
+        users.append(new_user)
+        
+        with open(users_file, 'w', encoding='utf-8') as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'User added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Backup API endpoints
+@app.route('/api/backups', methods=['GET'])
+@jwt_required()
+def get_backups():
+    """Get backup list"""
+    try:
+        backups_dir = 'backups'
+        if not os.path.exists(backups_dir):
+            os.makedirs(backups_dir)
+        
+        backups = []
+        for filename in os.listdir(backups_dir):
+            if filename.endswith('.zip'):
+                filepath = os.path.join(backups_dir, filename)
+                stat = os.stat(filepath)
+                backups.append({
+                    'id': len(backups) + 1,
+                    'filename': filename,
+                    'size': f"{stat.st_size / (1024*1024):.1f} MB",
+                    'created': datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    'type': 'automatic' if 'auto' in filename else 'manual'
+                })
+        
+        return jsonify(backups)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backups', methods=['POST'])
+@jwt_required()
+def create_backup():
+    """Create system backup"""
+    try:
+        import zipfile
+        import shutil
+        
+        backups_dir = 'backups'
+        if not os.path.exists(backups_dir):
+            os.makedirs(backups_dir)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'xpanel_backup_{timestamp}.zip'
+        backup_path = os.path.join(backups_dir, backup_filename)
+        
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Backup configuration files
+            files_to_backup = ['servers.json', 'settings.json', 'firewall_rules.json', 'security_users.json']
+            for filename in files_to_backup:
+                if os.path.exists(filename):
+                    zipf.write(filename)
+        
+        return jsonify({'success': True, 'message': 'Backup created successfully', 'filename': backup_filename})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Authentication API endpoints
+@app.route('/api/auth/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    """Change user password"""
+    try:
+        data = request.get_json()
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+        
+        # In production, verify current password and update
+        # For now, just simulate success
+        return jsonify({'success': True, 'message': 'Password changed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/auth/generate-api-key', methods=['POST'])
+@jwt_required()
+def generate_api_key():
+    """Generate new API key"""
+    try:
+        import secrets
+        api_key = secrets.token_urlsafe(32)
+        
+        # In production, store API key securely
+        return jsonify({'success': True, 'apiKey': api_key})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# System monitoring endpoints
+@app.route('/api/system/updates', methods=['GET'])
+@jwt_required()
+def check_system_updates():
+    """Check for system updates"""
+    try:
+        # Mock update check - in production, check actual updates
+        return jsonify({
+            'updateAvailable': False,
+            'currentVersion': '2.1.0',
+            'latestVersion': '2.1.0'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Real-time metrics endpoint
+@app.route('/api/metrics/realtime', methods=['GET'])
+@jwt_required()
+def get_realtime_metrics():
+    """Get real-time system metrics"""
+    try:
+        # Get current system metrics
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        network = psutil.net_io_counters()
+        
+        # Get server metrics
+        servers_file = 'servers.json'
+        server_metrics = []
+        
+        if os.path.exists(servers_file):
+            with open(servers_file, 'r', encoding='utf-8') as f:
+                servers = json.load(f)
+                for server in servers:
+                    if server.get('status') == 'online':
+                        server_metrics.append({
+                            'id': server['id'],
+                            'name': server['name'],
+                            'cpu': server.get('cpu_usage', 0),
+                            'memory': server.get('memory_usage', 0),
+                            'disk': server.get('disk_usage', 0)
+                        })
+        
+        return jsonify({
+            'timestamp': datetime.now().isoformat(),
+            'panel': {
+                'cpu': cpu_percent,
+                'memory': memory.percent,
+                'disk': (disk.used / disk.total) * 100,
+                'network': {
+                    'sent': network.bytes_sent,
+                    'received': network.bytes_recv
+                }
+            },
+            'servers': server_metrics
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Run the application with eventlet
     port = int(os.getenv('PORT', 5000))

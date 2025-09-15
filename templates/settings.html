@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_ultra.css') }}">
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 </head>
 <body>
     <div class="app">
@@ -80,14 +82,439 @@
             </header>
             
             <div class="content">
-                <div class="empty-state">
-                    <div class="empty-icon"><i class="fas fa-cog"></i></div>
-                    <div class="empty-title">System Settings</div>
-                    <div class="empty-description">Configuration panel for system settings, user preferences, and panel customization is under development.</div>
-                    <button class="btn-primary" onclick="window.location.href='/dashboard'">
-                        <i class="fas fa-arrow-left"></i>
-                        Back to Dashboard
+                <!-- Settings Navigation -->
+                <div class="settings-nav">
+                    <div class="settings-nav-item active" data-tab="general">
+                        <i class="fas fa-cog"></i>
+                        General
+                    </div>
+                    <div class="settings-nav-item" data-tab="panel">
+                        <i class="fas fa-desktop"></i>
+                        Panel
+                    </div>
+                    <div class="settings-nav-item" data-tab="notifications">
+                        <i class="fas fa-bell"></i>
+                        Notifications
+                    </div>
+                    <div class="settings-nav-item" data-tab="security">
+                        <i class="fas fa-shield-alt"></i>
+                        Security
+                    </div>
+                    <div class="settings-nav-item" data-tab="backup">
+                        <i class="fas fa-database"></i>
+                        Backup
+                    </div>
+                    <div class="settings-nav-item" data-tab="about">
+                        <i class="fas fa-info-circle"></i>
+                        About
+                    </div>
+                </div>
+
+                <!-- Settings Content -->
+                <div class="settings-content">
+                    <!-- General Settings -->
+                    <div class="settings-tab active" id="general-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>System Information</h3>
+                                <p>Basic system and panel information</p>
+                            </div>
+                            <div class="settings-grid">
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <label>Panel Version</label>
+                                        <span class="setting-value" id="panel-version">v2.1.0</span>
+                                    </div>
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <label>System Uptime</label>
+                                        <span class="setting-value" id="system-uptime">Loading...</span>
+                                    </div>
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <label>Total Servers</label>
+                                        <span class="setting-value" id="total-servers">0</span>
+                                    </div>
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <label>Active Agents</label>
+                                        <span class="setting-value" id="active-agents">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>General Settings</h3>
+                                <p>Configure basic panel behavior</p>
+                            </div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label for="panel-name">Panel Name</label>
+                                    <input type="text" id="panel-name" value="Xpanel Dashboard" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="timezone">Timezone</label>
+                                    <select id="timezone" class="form-select">
+                                        <option value="UTC">UTC</option>
+                                        <option value="America/New_York">Eastern Time</option>
+                                        <option value="America/Chicago">Central Time</option>
+                                        <option value="America/Denver">Mountain Time</option>
+                                        <option value="America/Los_Angeles">Pacific Time</option>
+                                        <option value="Europe/London">London</option>
+                                        <option value="Europe/Moscow" selected>Moscow</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="language">Language</label>
+                                    <select id="language" class="form-select">
+                                        <option value="en">English</option>
+                                        <option value="ru" selected>Русский</option>
+                                        <option value="es">Español</option>
+                                        <option value="fr">Français</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel Settings -->
+                    <div class="settings-tab" id="panel-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>Interface Settings</h3>
+                                <p>Customize panel appearance and behavior</p>
+                            </div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Theme</label>
+                                    <div class="radio-group">
+                                        <label class="radio-item">
+                                            <input type="radio" name="theme" value="dark" checked>
+                                            <span class="radio-custom"></span>
+                                            Dark Theme
+                                        </label>
+                                        <label class="radio-item">
+                                            <input type="radio" name="theme" value="light">
+                                            <span class="radio-custom"></span>
+                                            Light Theme
+                                        </label>
+                                        <label class="radio-item">
+                                            <input type="radio" name="theme" value="auto">
+                                            <span class="radio-custom"></span>
+                                            Auto (System)
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="toggle-group">
+                                        <label class="toggle-item">
+                                            <span>Enable Animations</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="enable-animations" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Auto-refresh Dashboard</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="auto-refresh" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Show System Notifications</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="system-notifications" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="refresh-interval">Refresh Interval (seconds)</label>
+                                    <input type="number" id="refresh-interval" value="30" min="5" max="300" class="form-input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notifications Settings -->
+                    <div class="settings-tab" id="notifications-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>Notification Preferences</h3>
+                                <p>Configure when and how you receive notifications</p>
+                            </div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <div class="toggle-group">
+                                        <label class="toggle-item">
+                                            <span>Server Down Alerts</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="server-down-alerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>High CPU Usage Alerts</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="cpu-alerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Memory Usage Alerts</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="memory-alerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Disk Space Alerts</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="disk-alerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Security Alerts</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="security-alerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="email-notifications">Email Notifications</label>
+                                    <input type="email" id="email-notifications" placeholder="admin@example.com" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="alert-threshold">CPU Alert Threshold (%)</label>
+                                    <input type="number" id="alert-threshold" value="80" min="50" max="95" class="form-input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Settings -->
+                    <div class="settings-tab" id="security-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>Security Configuration</h3>
+                                <p>Manage panel security and access control</p>
+                            </div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <div class="toggle-group">
+                                        <label class="toggle-item">
+                                            <span>Two-Factor Authentication</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="two-factor-auth">
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Auto-lock Session</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="auto-lock" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                        <label class="toggle-item">
+                                            <span>Login Notifications</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="login-notifications" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="session-timeout">Session Timeout (minutes)</label>
+                                    <input type="number" id="session-timeout" value="60" min="15" max="480" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="allowed-ips">Allowed IP Addresses (one per line)</label>
+                                    <textarea id="allowed-ips" rows="4" class="form-textarea" placeholder="192.168.1.0/24&#10;10.0.0.0/8"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn-secondary" onclick="settingsManager.changePassword()">
+                                        <i class="fas fa-key"></i>
+                                        Change Password
+                                    </button>
+                                    <button class="btn-secondary" onclick="settingsManager.generateApiKey()">
+                                        <i class="fas fa-code"></i>
+                                        Generate API Key
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Backup Settings -->
+                    <div class="settings-tab" id="backup-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>Backup & Restore</h3>
+                                <p>Manage system backups and data recovery</p>
+                            </div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <div class="toggle-group">
+                                        <label class="toggle-item">
+                                            <span>Automatic Backups</span>
+                                            <div class="toggle-switch">
+                                                <input type="checkbox" id="auto-backup" checked>
+                                                <span class="toggle-slider"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="backup-frequency">Backup Frequency</label>
+                                    <select id="backup-frequency" class="form-select">
+                                        <option value="daily" selected>Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="backup-retention">Backup Retention (days)</label>
+                                    <input type="number" id="backup-retention" value="30" min="1" max="365" class="form-input">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn-primary" onclick="settingsManager.createBackup()">
+                                        <i class="fas fa-download"></i>
+                                        Create Backup Now
+                                    </button>
+                                    <button class="btn-secondary" onclick="settingsManager.restoreBackup()">
+                                        <i class="fas fa-upload"></i>
+                                        Restore from Backup
+                                    </button>
+                                </div>
+                                <div class="backup-list" id="backup-list">
+                                    <!-- Backup list will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- About -->
+                    <div class="settings-tab" id="about-tab">
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>About Xpanel</h3>
+                                <p>System information and credits</p>
+                            </div>
+                            <div class="about-content">
+                                <div class="about-logo">
+                                    <i class="fas fa-cube"></i>
+                                    <h2>Xpanel</h2>
+                                    <p>Professional VPS Management Panel</p>
+                                </div>
+                                <div class="about-info">
+                                    <div class="info-item">
+                                        <strong>Version:</strong> 2.1.0
+                                    </div>
+                                    <div class="info-item">
+                                        <strong>Build:</strong> 20240915
+                                    </div>
+                                    <div class="info-item">
+                                        <strong>License:</strong> Commercial
+                                    </div>
+                                    <div class="info-item">
+                                        <strong>Support:</strong> support@xpanel.com
+                                    </div>
+                                </div>
+                                <div class="about-actions">
+                                    <button class="btn-primary" onclick="settingsManager.checkUpdates()">
+                                        <i class="fas fa-sync"></i>
+                                        Check for Updates
+                                    </button>
+                                    <button class="btn-secondary" onclick="window.open('https://docs.xpanel.com', '_blank')">
+                                        <i class="fas fa-book"></i>
+                                        Documentation
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Settings Button -->
+                <div class="settings-footer">
+                    <button class="btn-primary" onclick="settingsManager.saveSettings()">
+                        <i class="fas fa-save"></i>
+                        Save Settings
                     </button>
+                    <button class="btn-secondary" onclick="settingsManager.resetSettings()">
+                        <i class="fas fa-undo"></i>
+                        Reset to Defaults
+                    </button>
+                </div>
+            </div>
+
+            <!-- Change Password Modal -->
+            <div class="modal" id="change-password-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Change Password</h3>
+                        <button class="modal-close" onclick="settingsManager.closeModal('change-password-modal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="change-password-form">
+                            <div class="form-group">
+                                <label for="current-password">Current Password</label>
+                                <input type="password" id="current-password" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-password">New Password</label>
+                                <input type="password" id="new-password" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-password">Confirm New Password</label>
+                                <input type="password" id="confirm-password" class="form-input" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" onclick="settingsManager.closeModal('change-password-modal')">Cancel</button>
+                        <button class="btn-primary" onclick="settingsManager.submitPasswordChange()">Change Password</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Restore Backup Modal -->
+            <div class="modal" id="restore-backup-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Restore from Backup</h3>
+                        <button class="modal-close" onclick="settingsManager.closeModal('restore-backup-modal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="backup-file">Select Backup File</label>
+                            <input type="file" id="backup-file" accept=".zip,.tar.gz" class="form-input">
+                        </div>
+                        <div class="warning-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Warning: Restoring from backup will overwrite current settings and data. This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" onclick="settingsManager.closeModal('restore-backup-modal')">Cancel</button>
+                        <button class="btn-danger" onclick="settingsManager.submitRestore()">Restore Backup</button>
+                    </div>
                 </div>
             </div>
         </main>

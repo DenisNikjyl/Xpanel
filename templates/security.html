@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_ultra.css') }}">
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/security.js') }}"></script>
 </head>
 <body>
     <div class="app">
@@ -80,14 +82,289 @@
             </header>
             
             <div class="content">
-                <div class="empty-state">
-                    <div class="empty-icon"><i class="fas fa-shield-alt"></i></div>
-                    <div class="empty-title">Security Center</div>
-                    <div class="empty-description">Security monitoring, firewall management, and threat detection features are coming soon.</div>
-                    <button class="btn-primary" onclick="window.location.href='/dashboard'">
-                        <i class="fas fa-arrow-left"></i>
-                        Back to Dashboard
-                    </button>
+                <!-- Security Overview -->
+                <div class="security-overview">
+                    <div class="security-status">
+                        <div class="status-indicator" id="securityStatus">
+                            <div class="status-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-title">Статус безопасности</div>
+                                <div class="status-level" id="securityLevel">Защищено</div>
+                            </div>
+                        </div>
+                        <div class="security-score">
+                            <div class="score-circle" id="scoreCircle">
+                                <div class="score-value" id="scoreValue">85</div>
+                                <div class="score-label">из 100</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quick-actions">
+                        <button class="action-btn" id="scanSystem">
+                            <i class="fas fa-search"></i>
+                            <span>Сканировать систему</span>
+                        </button>
+                        <button class="action-btn" id="updateFirewall">
+                            <i class="fas fa-fire"></i>
+                            <span>Обновить фаервол</span>
+                        </button>
+                        <button class="action-btn" id="generateReport">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Отчет безопасности</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Security Metrics -->
+                <div class="security-metrics">
+                    <div class="metric-card">
+                        <div class="metric-icon threats">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-value" id="threatsBlocked">247</div>
+                            <div class="metric-label">Угроз заблокировано</div>
+                            <div class="metric-change positive">+12 за сегодня</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon firewall">
+                            <i class="fas fa-fire"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-value" id="firewallRules">156</div>
+                            <div class="metric-label">Правил фаервола</div>
+                            <div class="metric-change neutral">Активно</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon intrusions">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-value" id="intrusionAttempts">8</div>
+                            <div class="metric-label">Попыток вторжения</div>
+                            <div class="metric-change negative">За последний час</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon updates">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-value" id="securityUpdates">3</div>
+                            <div class="metric-label">Обновлений безопасности</div>
+                            <div class="metric-change warning">Требуют установки</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Tabs -->
+                <div class="security-tabs">
+                    <div class="tab-nav">
+                        <button class="tab-btn active" data-tab="threats">
+                            <i class="fas fa-bug"></i>
+                            Угрозы
+                        </button>
+                        <button class="tab-btn" data-tab="firewall">
+                            <i class="fas fa-fire"></i>
+                            Фаервол
+                        </button>
+                        <button class="tab-btn" data-tab="logs">
+                            <i class="fas fa-list"></i>
+                            Логи
+                        </button>
+                        <button class="tab-btn" data-tab="users">
+                            <i class="fas fa-users"></i>
+                            Пользователи
+                        </button>
+                    </div>
+
+                    <!-- Threats Tab -->
+                    <div class="tab-content active" id="threats-tab">
+                        <div class="threats-header">
+                            <h3>Обнаруженные угрозы</h3>
+                            <div class="threats-controls">
+                                <select id="threatFilter">
+                                    <option value="all">Все угрозы</option>
+                                    <option value="high">Высокий риск</option>
+                                    <option value="medium">Средний риск</option>
+                                    <option value="low">Низкий риск</option>
+                                </select>
+                                <button class="btn-secondary" id="refreshThreats">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Обновить
+                                </button>
+                            </div>
+                        </div>
+                        <div class="threats-list" id="threatsList">
+                            <!-- Threats will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Firewall Tab -->
+                    <div class="tab-content" id="firewall-tab">
+                        <div class="firewall-header">
+                            <h3>Правила фаервола</h3>
+                            <div class="firewall-controls">
+                                <button class="btn-primary" id="addFirewallRule">
+                                    <i class="fas fa-plus"></i>
+                                    Добавить правило
+                                </button>
+                                <button class="btn-secondary" id="refreshFirewall">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Обновить
+                                </button>
+                            </div>
+                        </div>
+                        <div class="firewall-rules" id="firewallRules">
+                            <!-- Firewall rules will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Logs Tab -->
+                    <div class="tab-content" id="logs-tab">
+                        <div class="logs-header">
+                            <h3>Логи безопасности</h3>
+                            <div class="logs-controls">
+                                <select id="logType">
+                                    <option value="all">Все логи</option>
+                                    <option value="auth">Аутентификация</option>
+                                    <option value="firewall">Фаервол</option>
+                                    <option value="intrusion">Вторжения</option>
+                                </select>
+                                <input type="date" id="logDate" class="form-input">
+                                <button class="btn-secondary" id="refreshLogs">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Обновить
+                                </button>
+                            </div>
+                        </div>
+                        <div class="logs-list" id="logsList">
+                            <!-- Logs will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Users Tab -->
+                    <div class="tab-content" id="users-tab">
+                        <div class="users-header">
+                            <h3>Управление пользователями</h3>
+                            <div class="users-controls">
+                                <button class="btn-primary" id="addUser">
+                                    <i class="fas fa-user-plus"></i>
+                                    Добавить пользователя
+                                </button>
+                                <button class="btn-secondary" id="refreshUsers">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Обновить
+                                </button>
+                            </div>
+                        </div>
+                        <div class="users-list" id="usersList">
+                            <!-- Users will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Firewall Rule Modal -->
+            <div class="modal" id="firewallRuleModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-fire"></i> Добавить правило фаервола</h3>
+                        <button class="modal-close" id="closeFirewallModal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Название правила</label>
+                            <input type="text" id="ruleName" class="form-input" placeholder="Название правила">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Действие</label>
+                                <select id="ruleAction" class="form-input">
+                                    <option value="allow">Разрешить</option>
+                                    <option value="deny">Запретить</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Протокол</label>
+                                <select id="ruleProtocol" class="form-input">
+                                    <option value="tcp">TCP</option>
+                                    <option value="udp">UDP</option>
+                                    <option value="icmp">ICMP</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Порт</label>
+                                <input type="text" id="rulePort" class="form-input" placeholder="80, 443, 22-25">
+                            </div>
+                            <div class="form-group">
+                                <label>IP адрес</label>
+                                <input type="text" id="ruleIP" class="form-input" placeholder="192.168.1.0/24">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Описание</label>
+                            <textarea id="ruleDescription" class="form-input" rows="3" placeholder="Описание правила"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" id="cancelFirewallRule">Отмена</button>
+                        <button class="btn-primary" id="saveFirewallRule">Сохранить</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add User Modal -->
+            <div class="modal" id="addUserModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-user-plus"></i> Добавить пользователя</h3>
+                        <button class="modal-close" id="closeUserModal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Имя пользователя</label>
+                            <input type="text" id="userName" class="form-input" placeholder="username">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="userEmail" class="form-input" placeholder="user@example.com">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Пароль</label>
+                                <input type="password" id="userPassword" class="form-input" placeholder="Пароль">
+                            </div>
+                            <div class="form-group">
+                                <label>Роль</label>
+                                <select id="userRole" class="form-input">
+                                    <option value="user">Пользователь</option>
+                                    <option value="admin">Администратор</option>
+                                    <option value="viewer">Наблюдатель</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="userActive" checked>
+                                Активный пользователь
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" id="cancelAddUser">Отмена</button>
+                        <button class="btn-primary" id="saveUser">Создать</button>
+                    </div>
                 </div>
             </div>
         </main>

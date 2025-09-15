@@ -7,6 +7,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_ultra.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 </head>
 <body>
     <div class="app">
@@ -80,14 +83,166 @@
             </header>
             
             <div class="content">
-                <div class="empty-state">
-                    <div class="empty-icon"><i class="fas fa-chart-line"></i></div>
-                    <div class="empty-title">Analytics Dashboard</div>
-                    <div class="empty-description">Advanced analytics and monitoring features are coming soon. Track performance metrics, usage trends, and system health.</div>
-                    <button class="btn-primary" onclick="window.location.href='/dashboard'">
-                        <i class="fas fa-arrow-left"></i>
-                        Back to Dashboard
-                    </button>
+                <!-- Analytics Controls -->
+                <div class="analytics-controls">
+                    <div class="control-group">
+                        <label for="time-range">Time Range:</label>
+                        <select id="time-range" class="time-range-select">
+                            <option value="1h">Last Hour</option>
+                            <option value="24h" selected>Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="server-filter">Server:</label>
+                        <select id="server-filter" class="server-filter-select">
+                            <option value="all">All Servers</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <button id="refresh-btn" class="btn-secondary">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                        <button id="export-btn" class="btn-primary">
+                            <i class="fas fa-download"></i>
+                            Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon cpu">
+                                <i class="fas fa-microchip"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-label">Average CPU Usage</div>
+                                <div class="metric-value" id="avg-cpu">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend" id="cpu-trend">
+                            <span class="trend-indicator">--</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon memory">
+                                <i class="fas fa-memory"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-label">Average Memory Usage</div>
+                                <div class="metric-value" id="avg-memory">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend" id="memory-trend">
+                            <span class="trend-indicator">--</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon disk">
+                                <i class="fas fa-hdd"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-label">Average Disk Usage</div>
+                                <div class="metric-value" id="avg-disk">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend" id="disk-trend">
+                            <span class="trend-indicator">--</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon network">
+                                <i class="fas fa-network-wired"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-label">Network Traffic</div>
+                                <div class="metric-value" id="network-traffic">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend" id="network-trend">
+                            <span class="trend-indicator">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-section">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3>System Performance Over Time</h3>
+                            <div class="chart-legend">
+                                <div class="legend-item">
+                                    <div class="legend-color cpu"></div>
+                                    <span>CPU</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color memory"></div>
+                                    <span>Memory</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color disk"></div>
+                                    <span>Disk</span>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="performance-chart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3>Server Distribution</h3>
+                        </div>
+                        <canvas id="server-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Detailed Analytics -->
+                <div class="analytics-details">
+                    <div class="detail-section">
+                        <div class="section-header">
+                            <h3>Top Resource Consumers</h3>
+                            <button class="btn-link" id="view-all-consumers">View All</button>
+                        </div>
+                        <div class="resource-list" id="resource-consumers">
+                            <div class="loading-placeholder">Loading resource data...</div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-header">
+                            <h3>Recent Alerts</h3>
+                            <button class="btn-link" id="view-all-alerts">View All</button>
+                        </div>
+                        <div class="alerts-list" id="recent-alerts">
+                            <div class="loading-placeholder">Loading alerts...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Insights -->
+                <div class="insights-section">
+                    <div class="section-header">
+                        <h3>Performance Insights</h3>
+                        <div class="insights-controls">
+                            <button class="btn-secondary" id="generate-report">
+                                <i class="fas fa-file-alt"></i>
+                                Generate Report
+                            </button>
+                        </div>
+                    </div>
+                    <div class="insights-grid" id="performance-insights">
+                        <div class="loading-placeholder">Analyzing performance data...</div>
+                    </div>
                 </div>
             </div>
         </main>

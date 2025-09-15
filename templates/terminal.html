@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_ultra.css') }}">
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/terminal.js') }}"></script>
 </head>
 <body>
     <div class="app">
@@ -80,14 +82,66 @@
             </header>
             
             <div class="content">
-                <div class="empty-state">
-                    <div class="empty-icon"><i class="fas fa-terminal"></i></div>
-                    <div class="empty-title">Web Terminal</div>
-                    <div class="empty-description">Web-based terminal functionality is under development. You'll be able to connect to your servers directly from the browser.</div>
-                    <button class="btn-primary" onclick="window.location.href='/dashboard'">
-                        <i class="fas fa-arrow-left"></i>
-                        Back to Dashboard
-                    </button>
+                <!-- Terminal Controls -->
+                <div class="terminal-controls">
+                    <div class="control-group">
+                        <label for="server-select">Select Server:</label>
+                        <select id="server-select" class="server-select">
+                            <option value="">Choose a server...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <button id="connect-btn" class="btn-primary" disabled>
+                            <i class="fas fa-plug"></i>
+                            Connect
+                        </button>
+                        <button id="disconnect-btn" class="btn-secondary" disabled>
+                            <i class="fas fa-times"></i>
+                            Disconnect
+                        </button>
+                        <button id="clear-btn" class="btn-secondary">
+                            <i class="fas fa-eraser"></i>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Terminal Container -->
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <i class="fas fa-terminal"></i>
+                            <span id="terminal-title">Terminal - Not Connected</span>
+                        </div>
+                        <div class="terminal-status">
+                            <div class="status-indicator" id="connection-status"></div>
+                            <span id="status-text">Disconnected</span>
+                        </div>
+                    </div>
+                    
+                    <div class="terminal-body">
+                        <div id="terminal-output" class="terminal-output"></div>
+                        <div class="terminal-input-line">
+                            <span class="terminal-prompt" id="terminal-prompt">$</span>
+                            <input type="text" id="terminal-input" class="terminal-input" disabled placeholder="Connect to a server to start...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connection Info -->
+                <div class="connection-info" id="connection-info" style="display: none;">
+                    <div class="info-item">
+                        <strong>Server:</strong> <span id="connected-server">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>User:</strong> <span id="connected-user">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Session:</strong> <span id="session-id">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Uptime:</strong> <span id="session-uptime">-</span>
+                    </div>
                 </div>
             </div>
         </main>

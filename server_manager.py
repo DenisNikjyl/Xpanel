@@ -433,6 +433,157 @@ class ServerManager:
                 'error': f'SSH connection failed: {str(e)}'
             }
     
+    def restart_agent(self, agent_id):
+        """Restart agent on server"""
+        try:
+            # Find server by agent ID
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    servers = json.load(f)
+                
+                server = next((s for s in servers if s['id'] == agent_id), None)
+                if not server:
+                    raise Exception('Server not found')
+                
+                # Connect via SSH and restart agent
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                if server.get('ssh_key'):
+                    key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        pkey=key
+                    )
+                else:
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        password=server.get('password', '')
+                    )
+                
+                # Restart agent service
+                stdin, stdout, stderr = ssh.exec_command('sudo systemctl restart xpanel-agent')
+                stdout.read()
+                ssh.close()
+                
+                return {'success': True, 'message': 'Agent restarted successfully'}
+            else:
+                raise Exception('No servers found')
+                
+        except Exception as e:
+            raise Exception(f'Failed to restart agent: {str(e)}')
+    
+    def update_agent(self, agent_id):
+        """Update agent on server"""
+        try:
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    servers = json.load(f)
+                
+                server = next((s for s in servers if s['id'] == agent_id), None)
+                if not server:
+                    raise Exception('Server not found')
+                
+                # Connect via SSH and update agent
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                if server.get('ssh_key'):
+                    key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        pkey=key
+                    )
+                else:
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        password=server.get('password', '')
+                    )
+                
+                # Update agent
+                update_commands = [
+                    'cd /opt/xpanel-agent',
+                    'sudo wget -O xpanel_agent.py https://raw.githubusercontent.com/xpanel/agent/main/xpanel_agent.py',
+                    'sudo systemctl restart xpanel-agent'
+                ]
+                
+                for cmd in update_commands:
+                    stdin, stdout, stderr = ssh.exec_command(cmd)
+                    stdout.read()
+                
+                ssh.close()
+                
+                return {'success': True, 'message': 'Agent updated successfully'}
+            else:
+                raise Exception('No servers found')
+                
+        except Exception as e:
+            raise Exception(f'Failed to update agent: {str(e)}')
+    
+    def remove_agent(self, agent_id):
+        """Remove agent from server"""
+        try:
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    servers = json.load(f)
+                
+                server = next((s for s in servers if s['id'] == agent_id), None)
+                if not server:
+                    raise Exception('Server not found')
+                
+                # Connect via SSH and remove agent
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                if server.get('ssh_key'):
+                    key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        pkey=key
+                    )
+                else:
+                    ssh.connect(
+                        hostname=server['host'],
+                        port=server['port'],
+                        username=server['username'],
+                        password=server.get('password', '')
+                    )
+                
+                # Remove agent
+                remove_commands = [
+                    'sudo systemctl stop xpanel-agent',
+                    'sudo systemctl disable xpanel-agent',
+                    'sudo rm -f /etc/systemd/system/xpanel-agent.service',
+                    'sudo rm -rf /opt/xpanel-agent',
+                    'sudo systemctl daemon-reload'
+                ]
+                
+                for cmd in remove_commands:
+                    stdin, stdout, stderr = ssh.exec_command(cmd)
+                    stdout.read()
+                
+                ssh.close()
+                
+                return {'success': True, 'message': 'Agent removed successfully'}
+            else:
+                raise Exception('No servers found')
+                
+        except Exception as e:
+            raise Exception(f'Failed to remove agent: {str(e)}')
+    
     def get_server_stats(self, server_id):
         """Get server statistics"""
         if server_id not in self.servers:
