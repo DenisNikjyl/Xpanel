@@ -50,6 +50,10 @@ def index_ru():
 
 @app.route('/dashboard')
 def dashboard():
+    return render_template('dashboard_ultra.html')
+
+@app.route('/dashboard/v2')
+def dashboard_v2():
     return render_template('dashboard_v2.html')
 
 @app.route('/dashboard/ultra')
