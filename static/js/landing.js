@@ -87,23 +87,33 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(el);
     });
     
-    // Typing Animation for Hero
+    // Typing Animation for Hero - DISABLED to prevent HTML tag issues
     const heroTitle = document.querySelector('.hero-title');
     if (heroTitle) {
-        const text = heroTitle.innerHTML;
-        heroTitle.innerHTML = '';
+        // Keep original HTML content intact
+        // const text = heroTitle.innerHTML;
+        // heroTitle.innerHTML = '';
         
-        let i = 0;
-        const typeWriter = () => {
-            if (i < text.length) {
-                heroTitle.innerHTML += text.charAt(i);
-                i++;
-                setTimeout(typeWriter, 50);
-            }
-        };
+        // let i = 0;
+        // const typeWriter = () => {
+        //     if (i < text.length) {
+        //         heroTitle.innerHTML += text.charAt(i);
+        //         i++;
+        //         setTimeout(typeWriter, 50);
+        //     }
+        // };
         
-        setTimeout(typeWriter, 500);
+        // setTimeout(typeWriter, 500);
     }
+    
+    // Global switchLanguage function
+    window.switchLanguage = function(lang) {
+        if (lang === 'ru') {
+            window.location.href = '/ru';
+        } else {
+            window.location.href = '/';
+        }
+    };
     
     // Parallax Effect
     window.addEventListener('scroll', () => {

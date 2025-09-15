@@ -378,6 +378,14 @@
             easing: 'ease-in-out',
             once: true
         });
+
+        function switchLanguage(lang) {
+            if (lang === 'ru') {
+                window.location.href = '/ru';
+            } else {
+                window.location.href = '/';
+            }
+        }
     </script>
 </body>
 </html>
