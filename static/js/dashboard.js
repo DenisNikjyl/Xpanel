@@ -27,9 +27,12 @@ function initDashboard() {
     // Check authentication
     const token = localStorage.getItem('token') || localStorage.getItem('xpanel_token');
     if (!token) {
+        console.log('No token found, redirecting to login');
         window.location.href = '/login';
         return;
     }
+    
+    console.log('Token found:', token ? 'Yes' : 'No');
     
     // Set authorization header for all requests
     window.authHeaders = {
@@ -242,8 +245,10 @@ function loadServers() {
         headers: window.authHeaders
     })
     .then(response => {
+        console.log('API Response status:', response.status);
         if (response.status === 422 || response.status === 401) {
             // Token expired or invalid, redirect to login
+            console.log('Token invalid, clearing and redirecting to login');
             localStorage.removeItem('token');
             localStorage.removeItem('xpanel_token');
             window.location.href = '/login';
@@ -669,8 +674,10 @@ function loadCustomActions() {
         headers: window.authHeaders
     })
     .then(response => {
+        console.log('API Response status:', response.status);
         if (response.status === 422 || response.status === 401) {
             // Token expired or invalid, redirect to login
+            console.log('Token invalid, clearing and redirecting to login');
             localStorage.removeItem('token');
             localStorage.removeItem('xpanel_token');
             window.location.href = '/login';
