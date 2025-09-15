@@ -104,12 +104,12 @@
                         <input type="text" class="search-input" placeholder="Поиск серверов, команд...">
                     </div>
                     
-                    <button class="header-action" data-tooltip="Уведомления">
+                    <button class="header-action btn-icon" data-tooltip="Уведомления">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge">3</span>
                     </button>
                     
-                    <button class="header-action" data-tooltip="Настройки">
+                    <button class="header-action btn-icon" data-tooltip="Настройки">
                         <i class="fas fa-cog"></i>
                     </button>
                     
@@ -222,7 +222,7 @@
                                 <i class="fas fa-server"></i>
                                 Серверы
                             </h3>
-                            <button class="btn btn-primary" onclick="showAddServerModal()">
+                            <button class="btn btn-primary" onclick="dashboard.showAddServerModal()">
                                 <i class="fas fa-plus"></i>
                                 Добавить сервер
                             </button>
@@ -253,7 +253,7 @@
                                     <i class="fas fa-filter"></i>
                                     Фильтр
                                 </button>
-                                <button class="btn btn-primary" onclick="showAddServerModal()">
+                                <button class="btn btn-primary" onclick="dashboard.showAddServerModal()">
                                     <i class="fas fa-plus"></i>
                                     Добавить сервер
                                 </button>
@@ -280,20 +280,20 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Системная статистика</h3>
-                            <select class="btn btn-secondary">
+                            <select class="btn btn-secondary custom-select">
                                 <option>Последний час</option>
                                 <option>Последние 24 часа</option>
                                 <option>Последние 7 дней</option>
                             </select>
                         </div>
                         <div class="card-body">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div class="chart-grid">
                                 <div>
-                                    <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Загрузка CPU</h4>
+                                    <h4 class="chart-title">Загрузка CPU</h4>
                                     <canvas id="cpu-chart" width="400" height="200"></canvas>
                                 </div>
                                 <div>
-                                    <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Использование памяти</h4>
+                                    <h4 class="chart-title">Использование памяти</h4>
                                     <canvas id="memory-chart" width="400" height="200"></canvas>
                                 </div>
                             </div>
@@ -314,17 +314,17 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">SSH Терминал</h3>
-                            <select class="btn btn-secondary" id="server-select">
+                            <select class="btn btn-secondary custom-select" id="server-select">
                                 <option value="">Выберите сервер</option>
                             </select>
                         </div>
                         <div class="card-body">
-                            <div style="background: #000; border-radius: 0.5rem; padding: 1rem; font-family: 'Courier New', monospace;">
-                                <div id="terminal-output" style="height: 400px; overflow-y: auto; margin-bottom: 1rem; color: #fff;">
-                                    <div style="color: #00ff00;">admin@xpanel:~$ <span style="color: #fff;">Добро пожаловать в Xpanel Terminal</span></div>
+                            <div class="terminal-container">
+                                <div id="terminal-output" class="terminal-output">
+                                    <div class="terminal-prompt">admin@xpanel:~$ <span style="color: #fff;">Добро пожаловать в Xpanel Terminal</span></div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: #00ff00;">admin@xpanel:~$</span>
+                                <div class="terminal-input-container">
+                                    <span class="terminal-prompt">admin@xpanel:~$</span>
                                     <input type="text" id="terminal-input" style="background: transparent; border: none; outline: none; color: #fff; flex: 1; font-family: inherit;" placeholder="Введите команду...">
                                 </div>
                             </div>
@@ -346,7 +346,7 @@
                         <div class="card-header">
                             <h3 class="card-title">Файлы и папки</h3>
                             <div style="display: flex; gap: 1rem;">
-                                <select class="btn btn-secondary">
+                                <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
                                     <option>Выберите сервер</option>
                                 </select>
                                 <button class="btn btn-secondary">
@@ -391,16 +391,16 @@
                             </div>
                             <div class="card-body">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                    <label style="color: var(--text-secondary);">Тема интерфейса</label>
-                                    <select class="btn btn-secondary">
+                                    <label class="settings-label">Тема интерфейса</label>
+                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
                                         <option>Темная</option>
                                         <option>Светлая</option>
                                         <option>Автоматически</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label style="color: var(--text-secondary);">Язык</label>
-                                    <select class="btn btn-secondary">
+                                    <label class="settings-label">Язык</label>
+                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
                                         <option>Русский</option>
                                         <option>English</option>
                                     </select>
@@ -417,12 +417,12 @@
                             </div>
                             <div class="card-body">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                    <label style="color: var(--text-secondary);">Двухфакторная аутентификация</label>
-                                    <input type="checkbox" style="transform: scale(1.2);">
+                                    <label class="settings-label">Двухфакторная аутентификация</label>
+                                    <input type="checkbox" class="settings-checkbox">
                                 </div>
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label style="color: var(--text-secondary);">Автоматический выход</label>
-                                    <select class="btn btn-secondary">
+                                    <label class="settings-label">Автоматический выход</label>
+                                    <select class="btn btn-secondary" style="appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23cbd5e1" d="M6 8L2 4h8z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px;">
                                         <option>30 минут</option>
                                         <option>1 час</option>
                                         <option>4 часа</option>

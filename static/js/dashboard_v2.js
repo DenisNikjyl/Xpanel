@@ -575,8 +575,61 @@ class DashboardV2 {
     }
 
     showNotification(message, type = 'info') {
-        // Create and show notification
-        console.log(`${type.toUpperCase()}: ${message}`);
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.5rem;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            max-width: 400px;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        const iconMap = {
+            'success': 'fas fa-check-circle',
+            'error': 'fas fa-exclamation-circle',
+            'warning': 'fas fa-exclamation-triangle',
+            'info': 'fas fa-info-circle'
+        };
+        
+        const colorMap = {
+            'success': 'var(--success)',
+            'error': 'var(--error)',
+            'warning': 'var(--warning)',
+            'info': 'var(--primary)'
+        };
+        
+        notification.innerHTML = `
+            <i class="${iconMap[type] || iconMap.info}" style="color: ${colorMap[type] || colorMap.info};"></i>
+            <span style="color: var(--text-primary); flex: 1;">${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem;">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, 5000);
     }
 
     // Server management functions
@@ -590,8 +643,63 @@ class DashboardV2 {
     }
 
     showAddServerModal() {
-        console.log('Show add server modal');
-        // Implement modal functionality
+        this.showNotification('Функция добавления сервера в разработке', 'info');
+    }
+
+    refreshDashboard() {
+        this.showNotification('Обновление данных...', 'info');
+        
+        try {
+            this.loadDashboardData();
+            this.updateSystemStats();
+            this.showNotification('Данные обновлены', 'success');
+        } catch (error) {
+            console.error('Refresh error:', error);
+            this.showNotification('Ошибка обновления данных', 'error');
+        }
+    }
+
+    copyToClipboard(text) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                this.showNotification('Скопировано в буфер обмена', 'success');
+            }).catch(() => {
+                this.showNotification('Ошибка копирования', 'error');
+            });
+        } else {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                this.showNotification('Скопировано в буфер обмена', 'success');
+            } catch (err) {
+                this.showNotification('Ошибка копирования', 'error');
+            }
+            document.body.removeChild(textArea);
+        }
+    }
+
+    downloadInstallScript() {
+        const script = `#!/bin/bash
+# Xpanel Agent Installation Script
+echo "Installing Xpanel Agent..."
+curl -sSL ${window.location.origin}/api/agent/install | bash`;
+        
+        const blob = new Blob([script], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'install-xpanel-agent.sh';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        this.showNotification('Скрипт установки загружен', 'success');
     }
 
     logout() {
