@@ -6,6 +6,9 @@ Simple script to run Xpanel in production mode
 
 import os
 import sys
+import eventlet
+eventlet.monkey_patch()
+
 from app import app, socketio
 
 if __name__ == '__main__':
@@ -18,11 +21,13 @@ if __name__ == '__main__':
     
     print(f"Starting Xpanel on {host}:{port}")
     
-    # Run with SocketIO
+    # Run with SocketIO and eventlet
+    print("Using eventlet server for WebSocket support")
     socketio.run(
         app,
         host=host,
         port=port,
         debug=False,
-        use_reloader=False
+        use_reloader=False,
+        log_output=True
     )
