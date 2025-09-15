@@ -64,6 +64,30 @@ def dashboard_ultra():
 def dashboard_modern():
     return render_template('dashboard_modern.html')
 
+@app.route('/servers')
+def servers_page():
+    return render_template('servers.html')
+
+@app.route('/terminal')
+def terminal_page():
+    return render_template('terminal.html')
+
+@app.route('/analytics')
+def analytics_page():
+    return render_template('analytics.html')
+
+@app.route('/agents')
+def agents_page():
+    return render_template('agents.html')
+
+@app.route('/security')
+def security_page():
+    return render_template('security.html')
+
+@app.route('/settings')
+def settings_page():
+    return render_template('settings.html')
+
 @app.route('/login')
 def login_page():
     return render_template('login_new.html')

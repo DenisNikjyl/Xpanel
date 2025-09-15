@@ -581,7 +581,34 @@ class UltraDashboard {
         
         // Handle navigation logic here
         const navText = e.currentTarget.querySelector('.nav-text').textContent;
-        console.log('Navigating to:', navText);
+        
+        // Navigate to different pages based on nav item
+        switch(navText) {
+            case 'Dashboard':
+                // Already on dashboard, just refresh
+                this.refreshDashboard();
+                break;
+            case 'Servers':
+                window.location.href = '/servers';
+                break;
+            case 'Terminal':
+                window.location.href = '/terminal';
+                break;
+            case 'Analytics':
+                window.location.href = '/analytics';
+                break;
+            case 'Agents':
+                window.location.href = '/agents';
+                break;
+            case 'Security':
+                window.location.href = '/security';
+                break;
+            case 'Settings':
+                window.location.href = '/settings';
+                break;
+            default:
+                console.log('Unknown navigation:', navText);
+        }
     }
 
     toggleView(e) {
