@@ -314,7 +314,7 @@ class XpanelAgent:
             import uuid
             mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
                            for elements in range(0,2*6,2)][::-1])
-            return f"{{hostname}}-{{mac}}"
+            return f"{hostname}-{mac}"
         except:
             return hostname
     
@@ -347,42 +347,42 @@ class XpanelAgent:
             # Процессы
             process_count = len(psutil.pids())
             
-            stats = {{
+            stats = {
                 'server_id': self.server_id,
                 'timestamp': datetime.now().isoformat(),
                 'hostname': socket.gethostname(),
                 'ip_address': self.get_local_ip(),
-                'cpu': {{
+                'cpu': {
                     'usage': round(cpu_percent, 1),
                     'cores': cpu_count
-                }},
-                'memory': {{
+                },
+                'memory': {
                     'total': memory.total,
                     'available': memory.available,
                     'used': memory.used,
                     'percent': round(memory.percent, 1)
-                }},
-                'disk': {{
+                },
+                'disk': {
                     'total': disk.total,
                     'used': disk.used,
                     'free': disk.free,
                     'percent': round((disk.used / disk.total) * 100, 1)
-                }},
-                'network': {{
+                },
+                'network': {
                     'bytes_sent': network.bytes_sent,
                     'bytes_recv': network.bytes_recv,
                     'packets_sent': network.packets_sent,
                     'packets_recv': network.packets_recv
-                }},
+                },
                 'load_average': load_avg,
                 'uptime': int(uptime),
                 'processes': process_count,
                 'agent_version': '2.0.0'
-            }}
+            }
             
             return stats
         except Exception as e:
-            self.logger.error(f"Ошибка сбора статистики: {{e}}")
+            self.logger.error(f"Ошибка сбора статистики: {e}")
             return None
     
     def get_local_ip(self):
@@ -403,58 +403,58 @@ class XpanelAgent:
             if not stats:
                 return False
                 
-            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/heartbeat"
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
             
             response = requests.post(
                 url,
                 json=stats,
                 timeout=10,
-                headers={{'Content-Type': 'application/json'}}
+                headers={'Content-Type': 'application/json'}
             )
             
             if response.status_code == 200:
                 self.logger.debug("Heartbeat отправлен успешно")
                 return True
             else:
-                self.logger.warning(f"Ошибка heartbeat: {{response.status_code}}")
+                self.logger.warning(f"Ошибка heartbeat: {response.status_code}")
                 return False
                 
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"Ошибка сети при отправке heartbeat: {{e}}")
+            self.logger.error(f"Ошибка сети при отправке heartbeat: {e}")
             return False
         except Exception as e:
-            self.logger.error(f"Ошибка отправки heartbeat: {{e}}")
+            self.logger.error(f"Ошибка отправки heartbeat: {e}")
             return False
     
     def register_with_panel(self):
         """Регистрация агента на панели"""
         try:
-            server_info = {{
+            server_info = {
                 'server_id': self.server_id,
                 'hostname': socket.gethostname(),
                 'ip_address': self.get_local_ip(),
                 'agent_version': '2.0.0',
                 'timestamp': datetime.now().isoformat()
-            }}
+            }
             
-            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/register"
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/register"
             
             response = requests.post(
                 url,
                 json=server_info,
                 timeout=10,
-                headers={{'Content-Type': 'application/json'}}
+                headers={'Content-Type': 'application/json'}
             )
             
             if response.status_code == 200:
                 self.logger.info("Успешная регистрация на панели")
                 return True
             else:
-                self.logger.error(f"Ошибка регистрации: {{response.status_code}}")
+                self.logger.error(f"Ошибка регистрации: {response.status_code}")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Ошибка регистрации: {{e}}")
+            self.logger.error(f"Ошибка регистрации: {e}")
             return False
     
     def heartbeat_loop(self):
@@ -465,8 +465,8 @@ class XpanelAgent:
     
     def start(self):
         """Запустить агент"""
-        self.logger.info(f"Запуск Xpanel Agent (ID: {{self.server_id}})")
-        self.logger.info(f"Панель: {{self.panel_address}}:{{self.panel_port}}")
+        self.logger.info(f"Запуск Xpanel Agent (ID: {self.server_id})")
+        self.logger.info(f"Панель: {self.panel_address}:{self.panel_port}")
         
         # Регистрация
         if not self.register_with_panel():
