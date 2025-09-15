@@ -292,6 +292,350 @@ def agent_register():
     return jsonify({'success': True, 'message': 'Agent registered successfully'})
 
 @app.route('/api/system/stats', methods=['GET'])
+@jwt_required()
+def get_system_stats():
+    try:
+        import psutil
+        
+        # Get system stats
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # Get network stats (simplified)
+        network = psutil.net_io_counters()
+        
+        return jsonify({
+            'cpu': {
+                'usage': cpu_percent,
+                'cores': psutil.cpu_count()
+            },
+            'memory': {
+                'total': memory.total,
+                'used': memory.used,
+                'percent': memory.percent
+            },
+            'disk': {
+                'total': disk.total,
+                'used': disk.used,
+                'percent': (disk.used / disk.total) * 100
+            },
+            'network': {
+                'bytes_sent': network.bytes_sent,
+                'bytes_recv': network.bytes_recv
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers', methods=['GET'])
+@jwt_required()
+def get_servers():
+    try:
+        # Load servers from file or database
+        servers_file = 'servers.json'
+        if os.path.exists(servers_file):
+            with open(servers_file, 'r', encoding='utf-8') as f:
+                servers = json.load(f)
+        else:
+            servers = []
+        
+        return jsonify(servers)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers', methods=['POST'])
+@jwt_required()
+def add_server():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['name', 'host', 'port', 'username']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'message': f'Поле {field} обязательно'}), 400
+        
+        # Load existing servers
+        servers_file = 'servers.json'
+        if os.path.exists(servers_file):
+            with open(servers_file, 'r', encoding='utf-8') as f:
+                servers = json.load(f)
+        else:
+            servers = []
+        
+        # Generate new server ID
+        server_id = str(len(servers) + 1)
+        
+        # Create new server object
+        new_server = {
+            'id': server_id,
+            'name': data['name'],
+            'host': data['host'],
+            'port': int(data['port']),
+            'username': data['username'],
+            'auth_method': data.get('auth_method', 'password'),
+            'description': data.get('description', ''),
+            'status': 'unknown',
+            'cpu_usage': 0,
+            'memory_usage': 0,
+            'disk_usage': 0,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        # Store password or SSH key securely (in production, use proper encryption)
+        if data.get('password'):
+            new_server['password'] = data['password']  # Should be encrypted
+        if data.get('ssh_key'):
+            new_server['ssh_key'] = data['ssh_key']  # Should be encrypted
+        
+        servers.append(new_server)
+        
+        # Save to file
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'message': 'Сервер успешно добавлен', 'server': new_server}), 201
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка добавления сервера: {str(e)}'}), 500
+
+@app.route('/api/servers/<server_id>', methods=['GET'])
+@jwt_required()
+def get_server(server_id):
+    try:
+        servers_file = 'servers.json'
+        if not os.path.exists(servers_file):
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        with open(servers_file, 'r', encoding='utf-8') as f:
+            servers = json.load(f)
+        
+        server = next((s for s in servers if s['id'] == server_id), None)
+        if not server:
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        # Remove sensitive data from response
+        server_copy = server.copy()
+        server_copy.pop('password', None)
+        server_copy.pop('ssh_key', None)
+        
+        return jsonify(server_copy)
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка загрузки сервера: {str(e)}'}), 500
+
+@app.route('/api/servers/<server_id>', methods=['PUT'])
+@jwt_required()
+def update_server(server_id):
+    try:
+        data = request.get_json()
+        servers_file = 'servers.json'
+        
+        if not os.path.exists(servers_file):
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        with open(servers_file, 'r', encoding='utf-8') as f:
+            servers = json.load(f)
+        
+        server_index = next((i for i, s in enumerate(servers) if s['id'] == server_id), None)
+        if server_index is None:
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        # Update server data
+        servers[server_index].update({
+            'name': data.get('name', servers[server_index]['name']),
+            'host': data.get('host', servers[server_index]['host']),
+            'port': int(data.get('port', servers[server_index]['port'])),
+            'username': data.get('username', servers[server_index]['username']),
+            'description': data.get('description', servers[server_index]['description']),
+            'updated_at': datetime.now().isoformat()
+        })
+        
+        # Save to file
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'message': 'Сервер обновлён'})
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка обновления сервера: {str(e)}'}), 500
+
+@app.route('/api/servers/<server_id>', methods=['DELETE'])
+@jwt_required()
+def delete_server(server_id):
+    try:
+        servers_file = 'servers.json'
+        
+        if not os.path.exists(servers_file):
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        with open(servers_file, 'r', encoding='utf-8') as f:
+            servers = json.load(f)
+        
+        servers = [s for s in servers if s['id'] != server_id]
+        
+        # Save to file
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'message': 'Сервер удалён'})
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка удаления сервера: {str(e)}'}), 500
+
+@app.route('/api/servers/<server_id>/test', methods=['POST'])
+@jwt_required()
+def test_server_connection(server_id):
+    try:
+        servers_file = 'servers.json'
+        
+        if not os.path.exists(servers_file):
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        with open(servers_file, 'r', encoding='utf-8') as f:
+            servers = json.load(f)
+        
+        server = next((s for s in servers if s['id'] == server_id), None)
+        if not server:
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        # Test SSH connection
+        import paramiko
+        
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        try:
+            if server['auth_method'] == 'key' and server.get('ssh_key'):
+                # Use SSH key authentication
+                key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    pkey=key,
+                    timeout=10
+                )
+            else:
+                # Use password authentication
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server.get('password', ''),
+                    timeout=10
+                )
+            
+            # Update server status
+            server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
+            servers[server_index]['status'] = 'online'
+            
+            # Get basic system info
+            stdin, stdout, stderr = ssh.exec_command('uptime')
+            uptime = stdout.read().decode().strip()
+            
+            ssh.close()
+            
+            # Save updated status
+            with open(servers_file, 'w', encoding='utf-8') as f:
+                json.dump(servers, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'message': 'Соединение успешно',
+                'status': 'online',
+                'uptime': uptime
+            })
+        
+        except Exception as conn_error:
+            # Update server status to offline
+            server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
+            servers[server_index]['status'] = 'offline'
+            
+            with open(servers_file, 'w', encoding='utf-8') as f:
+                json.dump(servers, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'message': f'Ошибка соединения: {str(conn_error)}',
+                'status': 'offline'
+            }), 400
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка тестирования соединения: {str(e)}'}), 500
+
+@app.route('/api/servers/execute', methods=['POST'])
+@jwt_required()
+def execute_command():
+    try:
+        data = request.get_json()
+        server_id = data.get('server_id')
+        command = data.get('command')
+        
+        if not server_id or not command:
+            return jsonify({'message': 'Не указан сервер или команда'}), 400
+        
+        # Load server data
+        servers_file = 'servers.json'
+        if not os.path.exists(servers_file):
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        with open(servers_file, 'r', encoding='utf-8') as f:
+            servers = json.load(f)
+        
+        server = next((s for s in servers if s['id'] == server_id), None)
+        if not server:
+            return jsonify({'message': 'Сервер не найден'}), 404
+        
+        # Execute command via SSH
+        import paramiko
+        
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        try:
+            if server['auth_method'] == 'key' and server.get('ssh_key'):
+                key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    pkey=key,
+                    timeout=10
+                )
+            else:
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server.get('password', ''),
+                    timeout=10
+                )
+            
+            # Execute command
+            stdin, stdout, stderr = ssh.exec_command(command)
+            
+            output = stdout.read().decode('utf-8', errors='ignore')
+            error = stderr.read().decode('utf-8', errors='ignore')
+            
+            ssh.close()
+            
+            result = output if output else error
+            
+            return jsonify({
+                'output': result,
+                'success': True
+            })
+        
+        except Exception as exec_error:
+            return jsonify({
+                'message': f'Ошибка выполнения команды: {str(exec_error)}',
+                'success': False
+            }), 400
+    
+    except Exception as e:
+        return jsonify({'message': f'Ошибка: {str(e)}'}), 500
+
+@app.route('/api/system/stats', methods=['GET'])
 def get_local_stats():
     """Get local system statistics"""
     try:

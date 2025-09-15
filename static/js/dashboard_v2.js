@@ -298,75 +298,117 @@ class DashboardV2 {
         const serversGrid = document.getElementById('servers-grid');
         const serversList = document.getElementById('servers-list');
         
-        if (!servers || servers.length === 0) {
-            this.displayEmptyServers();
+        if (!serversGrid && !serversList) return;
+        
+        if (servers.length === 0) {
+            const emptyState = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <h3 class="empty-title">Нет серверов</h3>
+                    <p class="empty-description">Добавьте свой первый сервер для начала работы</p>
+                </div>
+            `;
+            
+            if (serversGrid) serversGrid.innerHTML = emptyState;
+            if (serversList) serversList.innerHTML = emptyState;
             return;
         }
-
-        const serverHTML = servers.map(server => `
-            <div class="server-card" data-server-id="${server.id}">
-                <div class="server-header">
-                    <div class="server-name">${server.name}</div>
-                    <div class="server-status ${server.status}">${server.status === 'online' ? 'Онлайн' : 'Офлайн'}</div>
+        
+        const serversHTML = servers.map(server => {
+            const statusClass = this.getServerStatusClass(server.status);
+            const statusText = this.getServerStatusText(server.status);
+            
+            return `
+                <div class="server-card">
+                    <div class="server-header">
+                        <div class="server-info">
+                            <h4 class="server-name">${server.name}</h4>
+                            <p class="server-host">${server.host}:${server.port}</p>
+                            <p class="server-description">${server.description || ''}</p>
+                        </div>
+                        <div class="server-status ${statusClass}" title="${statusText}">
+                            <i class="fas fa-circle"></i>
+                        </div>
+                    </div>
+                    <div class="server-stats">
+                        <div class="stat">
+                            <span class="stat-label">CPU</span>
+                            <span class="stat-value">${server.cpu_usage || 0}%</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">RAM</span>
+                            <span class="stat-value">${server.memory_usage || 0}%</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Disk</span>
+                            <span class="stat-value">${server.disk_usage || 0}%</span>
+                        </div>
+                    </div>
+                    <div class="server-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="dashboard.connectToServer('${server.id}')" title="Подключиться по SSH">
+                            <i class="fas fa-terminal"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="dashboard.showEditServerModal('${server.id}')" title="Редактировать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="dashboard.showDeleteServerModal('${server.id}', '${server.name}')" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="dashboard.testServerConnection('${server.id}')" title="Проверить соединение">
+                            <i class="fas fa-plug"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="server-info">
-                    <div class="server-info-item">
-                        <i class="fas fa-globe server-info-icon"></i>
-                        <span>${server.ip}</span>
-                    </div>
-                    <div class="server-info-item">
-                        <i class="fas fa-microchip server-info-icon"></i>
-                        <span>CPU: ${server.cpu_usage || 0}%</span>
-                    </div>
-                    <div class="server-info-item">
-                        <i class="fas fa-memory server-info-icon"></i>
-                        <span>RAM: ${server.memory_usage || 0}%</span>
-                    </div>
-                    <div class="server-info-item">
-                        <i class="fas fa-hdd server-info-icon"></i>
-                        <span>Диск: ${server.disk_usage || 0}%</span>
-                    </div>
-                </div>
-                <div class="server-actions">
-                    <button class="btn btn-secondary" onclick="dashboard.connectToServer('${server.id}')">
-                        <i class="fas fa-terminal"></i>
-                        Терминал
-                    </button>
-                    <button class="btn btn-primary" onclick="dashboard.manageServer('${server.id}')">
-                        <i class="fas fa-cog"></i>
-                        Управление
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-        if (serversGrid) serversGrid.innerHTML = serverHTML;
-        if (serversList) serversList.innerHTML = serverHTML;
-
-        // Animate server cards
-        this.animateServerCards();
+            `;
+        }).join('');
+        
+        if (serversGrid) serversGrid.innerHTML = serversHTML;
+        if (serversList) serversList.innerHTML = serversHTML;
     }
 
-    displayEmptyServers() {
-        const emptyHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-server"></i>
-                </div>
-                <h3 class="empty-title">Нет подключенных серверов</h3>
-                <p class="empty-description">Добавьте свой первый сервер для начала работы</p>
-                <button class="btn btn-primary" onclick="dashboard.showAddServerModal()">
-                    <i class="fas fa-plus"></i>
-                    Добавить сервер
-                </button>
-            </div>
-        `;
+    getServerStatusClass(status) {
+        switch (status) {
+            case 'online': return 'status-online';
+            case 'offline': return 'status-offline';
+            case 'error': return 'status-error';
+            default: return 'status-unknown';
+        }
+    }
 
-        const serversGrid = document.getElementById('servers-grid');
-        const serversList = document.getElementById('servers-list');
-        
-        if (serversGrid) serversGrid.innerHTML = emptyHTML;
-        if (serversList) serversList.innerHTML = emptyHTML;
+    getServerStatusText(status) {
+        switch (status) {
+            case 'online': return 'Онлайн';
+            case 'offline': return 'Офлайн';
+            case 'error': return 'Ошибка';
+            default: return 'Неизвестно';
+        }
+    }
+
+    async testServerConnection(serverId) {
+        try {
+            this.showNotification('Проверка соединения...', 'info');
+            
+            const response = await fetch(`/api/servers/${serverId}/test`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification('Соединение успешно', 'success');
+                this.loadServers(); // Refresh to update status
+            } else {
+                this.showNotification(result.message || 'Ошибка соединения', 'error');
+            }
+        } catch (error) {
+            console.error('Test connection error:', error);
+            this.showNotification('Ошибка проверки соединения', 'error');
+        }
     }
 
     animateServerCards() {
@@ -635,15 +677,175 @@ class DashboardV2 {
     // Server management functions
     connectToServer(serverId) {
         this.navigateToSection('terminal');
-        console.log('Connecting to server:', serverId);
+        
+        // Set the selected server in terminal
+        const serverSelect = document.querySelector('#terminal-section #server-select');
+        if (serverSelect) {
+            serverSelect.value = serverId;
+        }
+        
+        this.showNotification('Переключение на терминал', 'info');
     }
 
     manageServer(serverId) {
-        console.log('Managing server:', serverId);
+        this.showEditServerModal(serverId);
     }
 
     showAddServerModal() {
-        this.showNotification('Функция добавления сервера в разработке', 'info');
+        const modal = document.getElementById('add-server-modal');
+        modal.classList.add('active');
+        
+        // Reset form
+        document.getElementById('add-server-form').reset();
+        document.getElementById('server-port').value = '22';
+        
+        // Setup auth method toggle
+        const authMethod = document.getElementById('auth-method');
+        const passwordGroup = document.getElementById('password-group');
+        const keyGroup = document.getElementById('key-group');
+        
+        authMethod.addEventListener('change', function() {
+            if (this.value === 'key') {
+                passwordGroup.style.display = 'none';
+                keyGroup.style.display = 'block';
+            } else {
+                passwordGroup.style.display = 'block';
+                keyGroup.style.display = 'none';
+            }
+        });
+    }
+
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('active');
+    }
+
+    async addServer() {
+        const form = document.getElementById('add-server-form');
+        const formData = new FormData(form);
+        const serverData = Object.fromEntries(formData.entries());
+        
+        try {
+            const response = await fetch('/api/servers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                },
+                body: JSON.stringify(serverData)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification('Сервер успешно добавлен', 'success');
+                this.closeModal('add-server-modal');
+                this.loadServers();
+            } else {
+                this.showNotification(result.message || 'Ошибка добавления сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Add server error:', error);
+            this.showNotification('Ошибка соединения с сервером', 'error');
+        }
+    }
+
+    showEditServerModal(serverId) {
+        const modal = document.getElementById('edit-server-modal');
+        modal.classList.add('active');
+        
+        // Load server data
+        this.loadServerForEdit(serverId);
+    }
+
+    async loadServerForEdit(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                const server = await response.json();
+                
+                document.getElementById('edit-server-id').value = server.id;
+                document.getElementById('edit-server-name').value = server.name;
+                document.getElementById('edit-server-host').value = server.host;
+                document.getElementById('edit-server-port').value = server.port;
+                document.getElementById('edit-server-username').value = server.username;
+                document.getElementById('edit-server-description').value = server.description || '';
+            } else {
+                this.showNotification('Ошибка загрузки данных сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Load server error:', error);
+            this.showNotification('Ошибка соединения', 'error');
+        }
+    }
+
+    async updateServer() {
+        const form = document.getElementById('edit-server-form');
+        const formData = new FormData(form);
+        const serverData = Object.fromEntries(formData.entries());
+        const serverId = serverData.id;
+        
+        try {
+            const response = await fetch(`/api/servers/${serverId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                },
+                body: JSON.stringify(serverData)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification('Сервер обновлён', 'success');
+                this.closeModal('edit-server-modal');
+                this.loadServers();
+            } else {
+                this.showNotification(result.message || 'Ошибка обновления сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Update server error:', error);
+            this.showNotification('Ошибка соединения', 'error');
+        }
+    }
+
+    showDeleteServerModal(serverId, serverName) {
+        const modal = document.getElementById('delete-server-modal');
+        modal.classList.add('active');
+        
+        document.getElementById('delete-server-id').value = serverId;
+        document.getElementById('delete-server-name').textContent = serverName;
+    }
+
+    async deleteServer() {
+        const serverId = document.getElementById('delete-server-id').value;
+        
+        try {
+            const response = await fetch(`/api/servers/${serverId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                this.showNotification('Сервер удалён', 'success');
+                this.closeModal('delete-server-modal');
+                this.loadServers();
+            } else {
+                const result = await response.json();
+                this.showNotification(result.message || 'Ошибка удаления сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Delete server error:', error);
+            this.showNotification('Ошибка соединения', 'error');
+        }
     }
 
     refreshDashboard() {
