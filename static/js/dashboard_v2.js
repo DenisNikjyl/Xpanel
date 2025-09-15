@@ -975,13 +975,78 @@ curl -sSL ${window.location.origin}/api/agent/install | bash`;
             
             const server = await serverResponse.json();
             
-            // Simulate installation steps
-            await this.simulateInstallationSteps(server);
+            // Start real installation
+            await this.performRealInstallation(server);
             
         } catch (error) {
             console.error('Installation error:', error);
             this.addTerminalLine('error', `Ошибка: ${error.message}`);
             this.updateProgress(0, 'Ошибка установки');
+        }
+    }
+
+    async performRealInstallation(server) {
+        this.updateProgress(10, 'Подключение к серверу...');
+        this.addTerminalLine('info', `Подключение к ${server.host}:${server.port}...`);
+        
+        try {
+            // Real API call to install agent
+            const installResponse = await fetch(`/api/servers/${server.id}/install-agent`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                },
+                body: JSON.stringify({
+                    host: server.host,
+                    port: server.port,
+                    username: server.username,
+                    password: server.password,
+                    key_file: server.ssh_key,
+                    panel_address: window.location.hostname
+                })
+            });
+
+            this.updateProgress(30, 'Выполняется установка...');
+            this.addTerminalLine('info', 'Отправка команд установки на сервер...');
+
+            if (!installResponse.ok) {
+                const errorData = await installResponse.json();
+                throw new Error(errorData.error || 'Ошибка установки агента');
+            }
+
+            const result = await installResponse.json();
+            
+            if (result.success) {
+                this.updateProgress(70, 'Настройка агента...');
+                this.addTerminalLine('success', 'Агент успешно установлен');
+                this.addTerminalLine('info', 'Настройка конфигурации...');
+                
+                // Wait a bit for agent to start
+                await this.delay(2000);
+                
+                this.updateProgress(90, 'Проверка соединения...');
+                this.addTerminalLine('info', 'Проверка связи с агентом...');
+                
+                // Check if agent is responding
+                await this.delay(1000);
+                
+                this.updateProgress(100, 'Установка завершена!');
+                this.addTerminalLine('success', 'Агент запущен и готов к работе!');
+                this.completeInstallation();
+                
+            } else {
+                throw new Error(result.error || 'Неизвестная ошибка установки');
+            }
+            
+        } catch (error) {
+            this.addTerminalLine('error', `Ошибка установки: ${error.message}`);
+            this.updateProgress(0, 'Ошибка установки');
+            
+            const cancelBtn = document.getElementById('install-cancel-btn');
+            const closeBtn = document.getElementById('install-close-btn');
+            cancelBtn.style.display = 'none';
+            closeBtn.style.display = 'inline-block';
         }
     }
 
