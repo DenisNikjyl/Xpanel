@@ -46,12 +46,14 @@ users_db = {
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
+    return render_template('landing.html')
+
+@app.route('/dashboard')
+def dashboard():
     return render_template('index.html')
 
 @app.route('/login')
 def login_page():
-    """Login page"""
     return render_template('login.html')
 
 @app.route('/api/login', methods=['POST'])
