@@ -42,7 +42,7 @@ agent_client = AgentClient()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('landing_ru.html')
 
 @app.route('/ru')
 def index_ru():
