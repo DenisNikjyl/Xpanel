@@ -69,28 +69,7 @@ def legacy_login():
     with app.app_context():
         return auth_bp.view_functions['login']()
 
-@app.route('/api/servers', methods=['GET'])
-@jwt_required()
-def get_servers():
-    """Get all servers with their status"""
-    servers = server_manager.get_all_servers()
-    return jsonify({'servers': servers})
-
-
-@app.route('/api/servers', methods=['POST'])
-@jwt_required()
-def add_server():
-    """Add new server"""
-    data = request.get_json()
-    server_id = server_manager.add_server(
-        name=data.get('name'),
-        host=data.get('host'),
-        port=data.get('port', 22),
-        username=data.get('username'),
-        password=data.get('password'),
-        key_file=data.get('key_file')
-    )
-    return jsonify({'success': True, 'server_id': server_id})
+# Removed duplicate route definitions - using the more complete implementations below
 
 @app.route('/api/servers/<server_id>/stats', methods=['GET'])
 @jwt_required()
@@ -122,15 +101,7 @@ def execute_command(server_id):
     result = server_manager.execute_command(server_id, command)
     return jsonify(result)
 
-@app.route('/api/servers/<server_id>', methods=['DELETE'])
-@jwt_required()
-def delete_server(server_id):
-    """Delete server from panel"""
-    try:
-        server_manager.remove_server(server_id)
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+# Removed duplicate delete_server route - using the more complete implementation below
 
 @app.route('/api/servers/<server_id>/remove-agent', methods=['POST'])
 @jwt_required()
@@ -547,7 +518,7 @@ def test_server_connection(server_id):
 
 @app.route('/api/servers/execute', methods=['POST'])
 @jwt_required()
-def execute_command():
+def execute_server_command():
     try:
         data = request.get_json()
         server_id = data.get('server_id')
