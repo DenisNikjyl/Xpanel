@@ -478,7 +478,7 @@
                         <label for="server-password">Пароль</label>
                         <input type="password" id="server-password" name="password" class="form-input" placeholder="••••••••">
                     </div>
-                    <div class="form-group" id="key-group" style="display: none">
+                    <div class="form-group" id="key-group" style="display: none;">
                         <label for="server-key">SSH ключ</label>
                         <textarea id="server-key" name="ssh_key" class="form-input" rows="4" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
                     </div>
@@ -563,6 +563,55 @@
         </div>
     </div>
 
+    <!-- Agent Installation Progress Modal -->
+    <div id="agent-install-modal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-download"></i>
+                    Установка агента
+                </h3>
+                <button class="modal-close" onclick="dashboard.closeModal('agent-install-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="install-progress">
+                    <div class="progress-header">
+                        <div class="progress-info">
+                            <span class="progress-label">Подключение к серверу...</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="install-progress-fill"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="terminal-container">
+                        <div class="terminal-header">
+                            <div class="terminal-controls">
+                                <span class="terminal-dot red"></span>
+                                <span class="terminal-dot yellow"></span>
+                                <span class="terminal-dot green"></span>
+                            </div>
+                            <div class="terminal-title">Консоль установки</div>
+                        </div>
+                        <div class="terminal-body" id="install-terminal">
+                            <div class="terminal-line">
+                                <span class="terminal-prompt">root@xpanel:~$</span>
+                                <span class="terminal-text">Начинаем установку агента...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="install-cancel-btn" onclick="dashboard.cancelInstallation()">Отмена</button>
+                <button type="button" class="btn btn-success" id="install-close-btn" onclick="dashboard.closeModal('agent-install-modal')" style="display: none;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/js/auth.js"></script>
@@ -570,7 +619,6 @@
     <script>
         // Initialize dashboard
         const dashboard = new DashboardV2();
-        dashboard.init();
     </script>
 </body>
 </html>

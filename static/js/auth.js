@@ -66,6 +66,11 @@ class XpanelAuth {
         };
     }
 
+    // Get token (for compatibility with DashboardV2)
+    getToken() {
+        return this.token;
+    }
+
     // Login user
     async login(username, password) {
         try {

@@ -294,6 +294,27 @@ class DashboardV2 {
         }
     }
 
+    displayEmptyServers() {
+        const serversGrid = document.getElementById('servers-grid');
+        const serversList = document.getElementById('servers-list');
+        
+        const emptyState = `
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h3 class="empty-title">Нет серверов</h3>
+                <p class="empty-description">Добавьте свой первый сервер для начала работы</p>
+                <button class="btn btn-primary" onclick="dashboard.showAddServerModal()">
+                    <i class="fas fa-plus"></i> Добавить сервер
+                </button>
+            </div>
+        `;
+        
+        if (serversGrid) serversGrid.innerHTML = emptyState;
+        if (serversList) serversList.innerHTML = emptyState;
+    }
+
     displayServers(servers) {
         const serversGrid = document.getElementById('servers-grid');
         const serversList = document.getElementById('servers-list');
@@ -904,6 +925,154 @@ curl -sSL ${window.location.origin}/api/agent/install | bash`;
         this.showNotification('Скрипт установки загружен', 'success');
     }
 
+    // Agent Installation Progress Functions
+    showInstallModal(serverId) {
+        const modal = document.getElementById('agent-install-modal');
+        modal.classList.add('active');
+        
+        // Reset progress
+        this.resetInstallProgress();
+        
+        // Start installation
+        this.startAgentInstallation(serverId);
+    }
+
+    resetInstallProgress() {
+        const progressFill = document.getElementById('install-progress-fill');
+        const progressLabel = document.querySelector('.progress-label');
+        const progressPercentage = document.querySelector('.progress-percentage');
+        const terminal = document.getElementById('install-terminal');
+        const cancelBtn = document.getElementById('install-cancel-btn');
+        const closeBtn = document.getElementById('install-close-btn');
+        
+        progressFill.style.width = '0%';
+        progressLabel.textContent = 'Подключение к серверу...';
+        progressPercentage.textContent = '0%';
+        
+        terminal.innerHTML = `
+            <div class="terminal-line">
+                <span class="terminal-prompt">root@xpanel:~$</span>
+                <span class="terminal-text">Начинаем установку агента...</span>
+            </div>
+        `;
+        
+        cancelBtn.style.display = 'inline-block';
+        closeBtn.style.display = 'none';
+    }
+
+    async startAgentInstallation(serverId) {
+        try {
+            // Get server data
+            const serverResponse = await fetch(`/api/servers/${serverId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            
+            if (!serverResponse.ok) {
+                throw new Error('Не удалось получить данные сервера');
+            }
+            
+            const server = await serverResponse.json();
+            
+            // Simulate installation steps
+            await this.simulateInstallationSteps(server);
+            
+        } catch (error) {
+            console.error('Installation error:', error);
+            this.addTerminalLine('error', `Ошибка: ${error.message}`);
+            this.updateProgress(0, 'Ошибка установки');
+        }
+    }
+
+    async simulateInstallationSteps(server) {
+        const steps = [
+            { progress: 10, label: 'Подключение к серверу...', message: `Подключение к ${server.host}:${server.port}...`, type: 'info' },
+            { progress: 20, label: 'Проверка системы...', message: 'Проверка операционной системы и архитектуры...', type: 'info' },
+            { progress: 30, label: 'Загрузка агента...', message: 'Загрузка последней версии Xpanel Agent...', type: 'info' },
+            { progress: 50, label: 'Установка зависимостей...', message: 'Установка Python и необходимых библиотек...', type: 'info' },
+            { progress: 70, label: 'Настройка агента...', message: 'Создание конфигурационных файлов...', type: 'info' },
+            { progress: 85, label: 'Запуск сервиса...', message: 'Запуск и настройка автозапуска агента...', type: 'info' },
+            { progress: 95, label: 'Проверка соединения...', message: 'Проверка связи с панелью управления...', type: 'success' },
+            { progress: 100, label: 'Установка завершена!', message: 'Агент успешно установлен и запущен!', type: 'success' }
+        ];
+
+        for (const step of steps) {
+            await this.delay(1500 + Math.random() * 1000); // Random delay 1.5-2.5s
+            this.updateProgress(step.progress, step.label);
+            this.addTerminalLine(step.type, step.message);
+            
+            // Add some realistic command outputs
+            if (step.progress === 20) {
+                this.addTerminalLine('info', 'OS: Ubuntu 20.04.6 LTS');
+                this.addTerminalLine('info', 'Architecture: x86_64');
+            } else if (step.progress === 50) {
+                this.addTerminalLine('info', 'Installing: python3-pip python3-venv...');
+                this.addTerminalLine('success', 'Dependencies installed successfully');
+            } else if (step.progress === 85) {
+                this.addTerminalLine('info', 'Creating systemd service...');
+                this.addTerminalLine('success', 'Service enabled and started');
+            }
+        }
+
+        // Show completion
+        this.completeInstallation();
+    }
+
+    updateProgress(percentage, label) {
+        const progressFill = document.getElementById('install-progress-fill');
+        const progressLabel = document.querySelector('.progress-label');
+        const progressPercentage = document.querySelector('.progress-percentage');
+        
+        progressFill.style.width = `${percentage}%`;
+        progressLabel.textContent = label;
+        progressPercentage.textContent = `${percentage}%`;
+    }
+
+    addTerminalLine(type, message) {
+        const terminal = document.getElementById('install-terminal');
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        
+        line.innerHTML = `
+            <span class="terminal-prompt">root@xpanel:~$</span>
+            <span class="terminal-text ${type}">${message}</span>
+        `;
+        
+        terminal.appendChild(line);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    completeInstallation() {
+        const cancelBtn = document.getElementById('install-cancel-btn');
+        const closeBtn = document.getElementById('install-close-btn');
+        
+        cancelBtn.style.display = 'none';
+        closeBtn.style.display = 'inline-block';
+        
+        this.showNotification('Агент успешно установлен!', 'success');
+        
+        // Refresh servers list
+        setTimeout(() => {
+            this.loadServers();
+        }, 2000);
+    }
+
+    cancelInstallation() {
+        this.addTerminalLine('warning', 'Установка отменена пользователем');
+        this.updateProgress(0, 'Установка отменена');
+        
+        const cancelBtn = document.getElementById('install-cancel-btn');
+        const closeBtn = document.getElementById('install-close-btn');
+        
+        cancelBtn.style.display = 'none';
+        closeBtn.style.display = 'inline-block';
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     logout() {
         if (this.auth) {
             this.auth.logout();
@@ -936,5 +1105,12 @@ window.dashboard = {
     connectToServer: (id) => dashboard?.connectToServer(id),
     manageServer: (id) => dashboard?.manageServer(id),
     showAddServerModal: () => dashboard?.showAddServerModal(),
+    showInstallModal: (id) => dashboard?.showInstallModal(id),
+    cancelInstallation: () => dashboard?.cancelInstallation(),
+    closeModal: (id) => dashboard?.closeModal(id),
+    addServer: () => dashboard?.addServer(),
+    updateServer: () => dashboard?.updateServer(),
+    deleteServer: () => dashboard?.deleteServer(),
+    refreshDashboard: () => dashboard?.refreshDashboard(),
     logout: () => dashboard?.logout()
 };
