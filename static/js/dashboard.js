@@ -367,35 +367,8 @@ function updateStatsDisplay() {
 }
 
 function setupWebSocket() {
-    // WebSocket connection for real-time updates
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
-    try {
-        const ws = new WebSocket(wsUrl);
-        
-        ws.onopen = function() {
-            console.log('WebSocket connected');
-        };
-        
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            handleWebSocketMessage(data);
-        };
-        
-        ws.onclose = function() {
-            console.log('WebSocket disconnected');
-            // Attempt to reconnect after 5 seconds
-            setTimeout(setupWebSocket, 5000);
-        };
-        
-        ws.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
-        
-    } catch (error) {
-        console.error('WebSocket setup failed:', error);
-    }
+    // WebSocket disabled for stability
+    console.log('WebSocket disabled for stability');
 }
 
 function handleWebSocketMessage(data) {

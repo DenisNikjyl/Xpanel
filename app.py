@@ -5,9 +5,9 @@ Main Flask application
 """
 
 from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room
 import psutil
 import json
 import os
@@ -29,8 +29,8 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Initialize extensions
 jwt = JWTManager(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Initialize managers
 server_manager = ServerManager()
@@ -335,7 +335,7 @@ def get_local_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# WebSocket events for real-time updates
+# SocketIO event handlers
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
@@ -347,49 +347,15 @@ def handle_disconnect():
     """Handle client disconnection"""
     print(f'Client disconnected: {request.sid}')
 
-@socketio.on('join_server_room')
-def handle_join_server_room(data):
-    """Join server-specific room for updates"""
-    server_id = data.get('server_id')
-    join_room(f'server_{server_id}')
-    emit('joined_room', {'server_id': server_id})
-
-@socketio.on('leave_server_room')
-def handle_leave_server_room(data):
-    """Leave server-specific room"""
-    server_id = data.get('server_id')
-    leave_room(f'server_{server_id}')
-    emit('left_room', {'server_id': server_id})
-
-def broadcast_stats():
-    """Background task to broadcast system stats"""
-    while True:
-        try:
-            # Get local stats
-            with app.app_context():
-                response = get_local_stats()
-                if response.status_code == 200:
-                    stats = response.get_json()
-                    socketio.emit('system_stats', stats)
-            
-            # Get stats for all servers
-            for server_id in server_manager.get_server_ids():
-                stats = server_manager.get_server_stats(server_id)
-                socketio.emit('server_stats', {
-                    'server_id': server_id,
-                    'stats': stats
-                }, room=f'server_{server_id}')
-            
-            time.sleep(5)  # Update every 5 seconds
-        except Exception as e:
-            print(f"Error in broadcast_stats: {e}")
-            time.sleep(5)
+@socketio.on('join_room')
+def handle_join_room(data):
+    """Handle client joining a room for server-specific updates"""
+    room = data.get('room')
+    if room:
+        join_room(room)
+        emit('joined_room', {'room': room})
 
 if __name__ == '__main__':
-    # Start background stats broadcasting
-    stats_thread = threading.Thread(target=broadcast_stats, daemon=True)
-    stats_thread.start()
-    
-    # Run the application
+    # Run the application with eventlet
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=True)
