@@ -20,12 +20,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Setup modals
     setupModals();
     
-    // Setup sidebar toggle for mobile
-    setupSidebarToggle();
-    
-    // Setup language switcher
-    setupLanguageSwitcher();
-    
     // Initialize WebSocket connection
     if (window.WebSocketManager) {
         window.WebSocketManager.connect();
@@ -152,7 +146,10 @@ function setupNavigation() {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             
-            const sectionId = item.dataset.section;
+            const sectionName = item.dataset.section;
+            const sectionId = sectionName + '-section';
+            
+            console.log('Switching to section:', sectionId);
             
             // Update active nav item
             navItems.forEach(nav => nav.classList.remove('active'));
@@ -163,9 +160,18 @@ function setupNavigation() {
             const targetSection = document.getElementById(sectionId);
             if (targetSection) {
                 targetSection.classList.add('active');
+                console.log('Section activated:', sectionId);
+            } else {
+                console.error('Section not found:', sectionId);
             }
         });
     });
+    
+    // Ensure dashboard section is visible by default
+    const dashboardSection = document.getElementById('dashboard-section');
+    if (dashboardSection) {
+        dashboardSection.classList.add('active');
+    }
 }
 
 function setupModals() {
@@ -332,64 +338,89 @@ async function loadServers() {
 }
 
 function updateServersDisplay() {
-    const emptyState = document.getElementById('empty-state');
+    const serversGrid = document.getElementById('servers-grid');
     const serversList = document.getElementById('servers-list');
-    const serversTableBody = document.getElementById('servers-table-body');
-    const quickStats = document.getElementById('quick-stats');
     
-    if (window.servers.length === 0) {
-        // Show empty state
-        if (emptyState) emptyState.style.display = 'block';
-        if (serversList) serversList.style.display = 'none';
-        if (quickStats) quickStats.style.display = 'none';
-        
-        // Show empty table
-        if (serversTableBody) {
-            serversTableBody.innerHTML = `
-                <tr class="empty-row">
-                    <td colspan="9">
-                        <div class="empty-table">
-                            <i class="fas fa-server"></i>
-                            <p>Нет добавленных серверов</p>
-                        </div>
-                    </td>
-                </tr>
+    // Update dashboard servers grid
+    if (serversGrid) {
+        if (window.servers.length === 0) {
+            serversGrid.innerHTML = `
+                <div class="empty-servers">
+                    <i class="fas fa-server"></i>
+                    <h4>Нет подключенных серверов</h4>
+                    <p>Добавьте свой первый сервер для начала работы</p>
+                    <button class="btn btn-primary" onclick="showAddServerModal()">
+                        <i class="fas fa-plus"></i>
+                        Добавить сервер
+                    </button>
+                </div>
             `;
+        } else {
+            serversGrid.innerHTML = window.servers.map(server => `
+                <div class="server-card">
+                    <div class="server-header">
+                        <h5>${server.name}</h5>
+                        <span class="server-status ${server.status}">${server.status === 'online' ? 'Онлайн' : 'Офлайн'}</span>
+                    </div>
+                    <div class="server-info">
+                        <p><i class="fas fa-globe"></i> ${server.host}</p>
+                        <p><i class="fas fa-microchip"></i> CPU: ${server.cpu || '0'}%</p>
+                        <p><i class="fas fa-memory"></i> RAM: ${server.memory || '0'}%</p>
+                    </div>
+                </div>
+            `).join('');
         }
-    } else {
-        // Show servers
-        if (emptyState) emptyState.style.display = 'none';
-        if (serversList) serversList.style.display = 'block';
-        if (quickStats) quickStats.style.display = 'grid';
-        
-        // Update servers table
-        if (serversTableBody) {
-            serversTableBody.innerHTML = window.servers.map(server => {
-                const lastPing = server.last_ping ? formatLastPing(server.last_ping) : 'Никогда';
-                const customActionsHtml = generateCustomActionsDropdown(server.id);
-                
-                return `
-                    <tr>
-                        <td><strong>${server.name}</strong></td>
-                        <td>${server.host}</td>
-                        <td>
-                            <div class="connection-indicator">
-                                <span class="status-badge ${getConnectionStatus(server)}">
-                                    ${getConnectionStatusText(server)}
-                                </span>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="ping-time">${lastPing}</span>
-                        </td>
-                        <td>${server.cpu_usage || '0'}%</td>
-                        <td>${server.memory_usage || '0'}%</td>
-                        <td>${server.disk_usage || '0'}%</td>
-                        <td>
-                            ${customActionsHtml}
-                        </td>
-                        <td>
-                            <div class="server-actions">
+    }
+    
+    // Update servers list page
+    if (serversList) {
+        if (window.servers.length === 0) {
+            serversList.innerHTML = `
+                <div class="empty-servers">
+                    <i class="fas fa-server"></i>
+                    <h4>Нет подключенных серверов</h4>
+                    <p>Добавьте свой первый сервер для начала работы</p>
+                    <button class="btn btn-primary" onclick="showAddServerModal()">
+                        <i class="fas fa-plus"></i>
+                        Добавить сервер
+                    </button>
+                </div>
+            `;
+        } else {
+            serversList.innerHTML = window.servers.map(server => `
+                <div class="server-card">
+                    <div class="server-header">
+                        <h5>${server.name}</h5>
+                        <span class="server-status ${server.status || 'offline'}">${server.status === 'online' ? 'Онлайн' : 'Офлайн'}</span>
+                    </div>
+                    <div class="server-info">
+                        <p><i class="fas fa-globe"></i> ${server.host}</p>
+                        <p><i class="fas fa-microchip"></i> CPU: ${server.cpu || '0'}%</p>
+                        <p><i class="fas fa-memory"></i> RAM: ${server.memory || '0'}%</p>
+                    </div>
+                    <div class="server-actions">
+                        <button class="btn btn-secondary" onclick="connectToServer('${server.id}')">
+                            <i class="fas fa-terminal"></i>
+                            Терминал
+                        </button>
+                        <button class="btn btn-secondary" onclick="manageServer('${server.id}')">
+                            <i class="fas fa-cog"></i>
+                            Управление
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+function updateStatsDisplay() {
+    // Update server count and stats
+    const serverCount = window.servers ? window.servers.length : 0;
+    const onlineServers = window.servers ? window.servers.filter(s => s.status === 'online').length : 0;
+    
+    console.log(`Stats: ${serverCount} total servers, ${onlineServers} online`);
+}
                                 <button class="btn-small" onclick="connectToServer('${server.id}')" title="Подключиться">
                                     <i class="fas fa-terminal"></i>
                                 </button>
