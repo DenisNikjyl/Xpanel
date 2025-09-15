@@ -19,6 +19,8 @@ import bcrypt
 from server_manager import ServerManager
 from agent_client import AgentClient
 from auth import auth_bp, require_auth, get_current_user
+from ssh_manager import ssh_manager
+from real_agent_installer import real_installer
 
 # Load environment variables
 load_dotenv()
@@ -211,7 +213,7 @@ def execute_custom_action():
 @app.route('/api/servers/install-agent', methods=['POST'])
 @jwt_required()
 def install_agent_remote():
-    """Automatically install agent on remote server"""
+    """Automatically install agent on remote server using real SSH"""
     data = request.get_json()
     
     host = data.get('host')
@@ -219,23 +221,100 @@ def install_agent_remote():
     username = data.get('username')
     password = data.get('password')
     key_file = data.get('key_file')
-    panel_address = data.get('panel_address', request.host.split(':')[0])
+    server_name = data.get('name', host)
+    panel_address = request.host.split(':')[0] if request.host else 'localhost'
     
     if not all([host, username]):
-        return jsonify({'success': False, 'error': 'Host and username are required'}), 400
+        return jsonify({'success': False, 'error': 'Host и username обязательны'}), 400
+    
+    # Проверяем, что указан пароль или ключ
+    if not password and not key_file:
+        return jsonify({'success': False, 'error': 'Необходимо указать пароль или SSH ключ'}), 400
     
     try:
-        result = server_manager.install_agent_remote(
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            key_file=key_file,
-            panel_address=panel_address
-        )
-        return jsonify(result)
+        # Настраиваем установщик с правильным адресом панели
+        real_installer.panel_address = panel_address
+        real_installer.panel_port = 5000
+        
+        server_config = {
+            'host': host,
+            'port': port,
+            'username': username,
+            'password': password,
+            'key_file': key_file,
+            'name': server_name
+        }
+        
+        # Запускаем установку в отдельном потоке для WebSocket уведомлений
+        def install_with_progress():
+            def progress_callback(progress_data):
+                # Отправляем прогресс через WebSocket
+                socketio.emit('installation_progress', {
+                    'server': host,
+                    'progress': progress_data
+                })
+            
+            result = real_installer.install_agent(server_config, progress_callback)
+            
+            # Отправляем финальный результат
+            socketio.emit('installation_complete', {
+                'server': host,
+                'result': result
+            })
+            
+            # Если установка успешна, добавляем сервер в базу
+            if result['success']:
+                try:
+                    servers_file = 'servers.json'
+                    servers = []
+                    
+                    if os.path.exists(servers_file):
+                        with open(servers_file, 'r', encoding='utf-8') as f:
+                            servers = json.load(f)
+                    
+                    # Проверяем, не существует ли уже такой сервер
+                    existing_server = next((s for s in servers if s['host'] == host), None)
+                    if not existing_server:
+                        new_server = {
+                            'id': str(len(servers) + 1),
+                            'name': server_name,
+                            'host': host,
+                            'port': port,
+                            'username': username,
+                            'auth_method': 'key' if key_file else 'password',
+                            'status': 'online',
+                            'agent_installed': True,
+                            'created_at': datetime.now().isoformat(),
+                            'last_seen': datetime.now().isoformat()
+                        }
+                        
+                        # Сохраняем пароль/ключ (в продакшене нужно шифровать)
+                        if password:
+                            new_server['password'] = password
+                        if key_file:
+                            new_server['ssh_key'] = key_file
+                        
+                        servers.append(new_server)
+                        
+                        with open(servers_file, 'w', encoding='utf-8') as f:
+                            json.dump(servers, f, ensure_ascii=False, indent=2)
+                            
+                except Exception as e:
+                    print(f"Ошибка сохранения сервера: {e}")
+        
+        # Запускаем установку в фоне
+        install_thread = threading.Thread(target=install_with_progress)
+        install_thread.daemon = True
+        install_thread.start()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Установка агента запущена. Следите за прогрессом в реальном времени.',
+            'installation_started': True
+        })
+        
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': f'Ошибка запуска установки: {str(e)}'}), 500
 
 @app.route('/api/agent/install-script')
 def get_install_script():
@@ -364,7 +443,7 @@ def get_servers():
         else:
             servers = []
         
-        return jsonify(servers)
+        return jsonify({'servers': servers})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -511,6 +590,7 @@ def delete_server(server_id):
 @app.route('/api/servers/<server_id>/test', methods=['POST'])
 @jwt_required()
 def test_server_connection(server_id):
+    """Test SSH connection to server using improved SSH manager"""
     try:
         servers_file = 'servers.json'
         
@@ -524,63 +604,34 @@ def test_server_connection(server_id):
         if not server:
             return jsonify({'message': 'Сервер не найден'}), 404
         
-        # Test SSH connection
-        import paramiko
+        # Test connection using new SSH manager
+        result = ssh_manager.test_connection(
+            host=server['host'],
+            port=server['port'],
+            username=server['username'],
+            password=server.get('password'),
+            key_file=server.get('ssh_key')
+        )
         
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Update server status
+        server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
+        servers[server_index]['status'] = 'online' if result['success'] else 'offline'
+        servers[server_index]['last_seen'] = datetime.now().isoformat()
         
-        try:
-            if server['auth_method'] == 'key' and server.get('ssh_key'):
-                # Use SSH key authentication
-                key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
-                ssh.connect(
-                    hostname=server['host'],
-                    port=server['port'],
-                    username=server['username'],
-                    pkey=key,
-                    timeout=10
-                )
-            else:
-                # Use password authentication
-                ssh.connect(
-                    hostname=server['host'],
-                    port=server['port'],
-                    username=server['username'],
-                    password=server.get('password', ''),
-                    timeout=10
-                )
-            
-            # Update server status
-            server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
-            servers[server_index]['status'] = 'online'
-            
-            # Get basic system info
-            stdin, stdout, stderr = ssh.exec_command('uptime')
-            uptime = stdout.read().decode().strip()
-            
-            ssh.close()
-            
-            # Save updated status
-            with open(servers_file, 'w', encoding='utf-8') as f:
-                json.dump(servers, f, ensure_ascii=False, indent=2)
-            
+        # Save updated status
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
+        
+        if result['success']:
             return jsonify({
-                'message': 'Соединение успешно',
+                'message': result['message'],
                 'status': 'online',
-                'uptime': uptime
+                'system_info': result.get('system_info', ''),
+                'last_seen': servers[server_index]['last_seen']
             })
-        
-        except Exception as conn_error:
-            # Update server status to offline
-            server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
-            servers[server_index]['status'] = 'offline'
-            
-            with open(servers_file, 'w', encoding='utf-8') as f:
-                json.dump(servers, f, ensure_ascii=False, indent=2)
-            
+        else:
             return jsonify({
-                'message': f'Ошибка соединения: {str(conn_error)}',
+                'message': result['message'],
                 'status': 'offline'
             }), 400
     
@@ -590,10 +641,12 @@ def test_server_connection(server_id):
 @app.route('/api/servers/execute', methods=['POST'])
 @jwt_required()
 def execute_server_command():
+    """Execute command on server using improved SSH manager"""
     try:
         data = request.get_json()
         server_id = data.get('server_id')
         command = data.get('command')
+        timeout = data.get('timeout', 30)
         
         if not server_id or not command:
             return jsonify({'message': 'Не указан сервер или команда'}), 400
@@ -610,54 +663,36 @@ def execute_server_command():
         if not server:
             return jsonify({'message': 'Сервер не найден'}), 404
         
-        # Execute command via SSH
-        import paramiko
+        # Execute command using SSH manager
+        result = ssh_manager.execute_command(
+            server_id=server_id,
+            host=server['host'],
+            port=server['port'],
+            username=server['username'],
+            password=server.get('password'),
+            key_file=server.get('ssh_key'),
+            command=command,
+            timeout=timeout
+        )
         
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Update last seen time
+        server_index = next(i for i, s in enumerate(servers) if s['id'] == server_id)
+        servers[server_index]['last_seen'] = datetime.now().isoformat()
+        servers[server_index]['status'] = 'online' if result['success'] else 'offline'
         
-        try:
-            if server['auth_method'] == 'key' and server.get('ssh_key'):
-                key = paramiko.RSAKey.from_private_key(io.StringIO(server['ssh_key']))
-                ssh.connect(
-                    hostname=server['host'],
-                    port=server['port'],
-                    username=server['username'],
-                    pkey=key,
-                    timeout=10
-                )
-            else:
-                ssh.connect(
-                    hostname=server['host'],
-                    port=server['port'],
-                    username=server['username'],
-                    password=server.get('password', ''),
-                    timeout=10
-                )
-            
-            # Execute command
-            stdin, stdout, stderr = ssh.exec_command(command)
-            
-            output = stdout.read().decode('utf-8', errors='ignore')
-            error = stderr.read().decode('utf-8', errors='ignore')
-            
-            ssh.close()
-            
-            result = output if output else error
-            
-            return jsonify({
-                'output': result,
-                'success': True
-            })
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
         
-        except Exception as exec_error:
-            return jsonify({
-                'message': f'Ошибка выполнения команды: {str(exec_error)}',
-                'success': False
-            }), 400
+        return jsonify({
+            'output': result.get('output', ''),
+            'error': result.get('error'),
+            'success': result['success'],
+            'exit_code': result.get('exit_code', 0),
+            'timestamp': result.get('timestamp')
+        })
     
     except Exception as e:
-        return jsonify({'message': f'Ошибка: {str(e)}'}), 500
+        return jsonify({'message': f'Ошибка: {str(e)}', 'success': False}), 500
 
 # SocketIO event handlers
 @socketio.on('connect')
@@ -787,16 +822,69 @@ def get_system_info():
 @app.route('/api/agents', methods=['GET'])
 @jwt_required()
 def get_agents():
-    """Get all agents"""
+    """Get all agents (live registry)"""
     try:
-        agents_file = 'agents.json'
-        if os.path.exists(agents_file):
-            with open(agents_file, 'r', encoding='utf-8') as f:
-                agents = json.load(f)
-        else:
-            agents = []
-        
-        return jsonify(agents)
+        agents_raw = agent_client.get_all_agents()
+        transformed = []
+        now = datetime.utcnow()
+        for a in agents_raw:
+            agent_id = a.get('id') or a.get('server_id')
+            info = a.get('server_info', {}) or {}
+            stats = a.get('stats', {}) or {}
+            last_hb_iso = a.get('last_heartbeat')
+            try:
+                last_hb = datetime.fromisoformat(last_hb_iso.replace('Z', '+00:00')) if last_hb_iso else None
+            except Exception:
+                last_hb = None
+            status = 'offline'
+            if last_hb:
+                delta = now - last_hb.replace(tzinfo=None)
+                status = 'online' if delta.total_seconds() < 120 else 'offline'
+
+            cpu_usage = 0.0
+            mem_percent = 0.0
+            disk_percent = 0.0
+            net_in = 0
+            net_out = 0
+            uptime = 0
+            version = info.get('agent_version', '1.0.0')
+
+            if stats:
+                cpu = stats.get('cpu') or {}
+                memory = stats.get('memory') or {}
+                disk = stats.get('disk') or {}
+                network = stats.get('network') or {}
+                cpu_usage = float(cpu.get('usage') or 0)
+                mem_percent = float(memory.get('percent') or 0)
+                # disk percent may be given directly or compute
+                if 'percent' in disk:
+                    disk_percent = float(disk.get('percent') or 0)
+                else:
+                    try:
+                        disk_percent = (float(disk.get('used')) / float(disk.get('total'))) * 100.0
+                    except Exception:
+                        disk_percent = 0.0
+                net_in = int(network.get('bytes_recv') or 0)
+                net_out = int(network.get('bytes_sent') or 0)
+                uptime = int(stats.get('uptime') or 0)
+
+            transformed.append({
+                'id': agent_id,
+                'server_name': info.get('hostname') or agent_id or 'Unknown',
+                'host': info.get('ip_address') or '0.0.0.0',
+                'status': status,
+                'version': version,
+                'last_seen': last_hb_iso or now.isoformat(),
+                'uptime': uptime,
+                'cpu_usage': round(cpu_usage, 1),
+                'memory_usage': round(mem_percent, 1),
+                'disk_usage': round(disk_percent, 1),
+                'network_in': net_in,
+                'network_out': net_out,
+                'installed_at': info.get('timestamp') or now.isoformat()
+            })
+
+        return jsonify({'agents': transformed})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

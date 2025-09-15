@@ -443,8 +443,18 @@ class ServerManager:
             steps.append("Starting agent...")
             detailed_output.append("[INFO] Executing installation script...")
             
-            install_command = "sudo " + script_path + " --panel-address " + panel_address
-            stdin, stdout, stderr = ssh.exec_command(install_command)
+            # Use sudo -S to provide password non-interactively if needed
+            if password:
+                install_command = "sudo -S -p '' bash " + script_path + " --panel-address " + panel_address
+                stdin, stdout, stderr = ssh.exec_command(install_command, get_pty=True)
+                try:
+                    stdin.write(password + "\n")
+                    stdin.flush()
+                except Exception:
+                    pass
+            else:
+                install_command = "sudo bash " + script_path + " --panel-address " + panel_address
+                stdin, stdout, stderr = ssh.exec_command(install_command, get_pty=True)
             
             output = stdout.read().decode()
             error = stderr.read().decode()
@@ -757,22 +767,22 @@ SERVICE_NAME="xpanel-agent"
 PANEL_ADDRESS="{panel_address}"
 PANEL_PORT="5000"
 
-echo -e "${{BLUE}}========================================${{NC}}"
-echo -e "${{BLUE}}    Xpanel Agent Auto-Installation${{NC}}"
-echo -e "${{BLUE}}========================================${{NC}}"
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}    Xpanel Agent Auto-Installation${NC}"
+echo -e "${BLUE}========================================${NC}"
 
 # Function to print status
-print_status() {{
-    echo -e "${{GREEN}}[INFO]${{NC}} $1"
-}}
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
 
-print_warning() {{
-    echo -e "${{YELLOW}}[WARNING]${{NC}} $1"
-}}
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
 
-print_error() {{
-    echo -e "${{RED}}[ERROR]${{NC}} $1"
-}}
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -833,7 +843,7 @@ class XpanelAgent:
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('/var/log/xpanel-agent.log'),
+                logging.FileHandler('/opt/xpanel-agent/xpanel-agent.log'),
                 logging.StreamHandler()
             ]
         )
@@ -845,7 +855,7 @@ class XpanelAgent:
             import uuid
             mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
                            for elements in range(0,2*6,2)][::-1])
-            return f"{{hostname}}-{{mac}}"
+            return f"{hostname}-{mac}"
         except:
             return hostname
     
@@ -860,38 +870,38 @@ class XpanelAgent:
             boot_time = psutil.boot_time()
             uptime = time.time() - boot_time
             
-            stats = {{
+            stats = {
                 'server_id': self.server_id,
                 'timestamp': datetime.now().isoformat(),
-                'cpu': {{
+                'cpu': {
                     'usage': cpu_percent,
                     'cores': cpu_count
-                }},
-                'memory': {{
+                },
+                'memory': {
                     'total': memory.total,
                     'available': memory.available,
                     'used': memory.used,
                     'percent': memory.percent
-                }},
-                'disk': {{
+                },
+                'disk': {
                     'total': disk.total,
                     'used': disk.used,
                     'free': disk.free,
                     'percent': (disk.used / disk.total) * 100
-                }},
-                'network': {{
+                },
+                'network': {
                     'bytes_sent': network.bytes_sent,
                     'bytes_recv': network.bytes_recv,
                     'packets_sent': network.packets_sent,
                     'packets_recv': network.packets_recv
-                }},
+                },
                 'load_average': load_avg,
                 'uptime': uptime
-            }}
+            }
             
             return stats
         except Exception as e:
-            self.logger.error(f"Error collecting system stats: {{e}}")
+            self.logger.error(f"Error collecting system stats: {e}")
             return None
     
     def send_heartbeat(self):
@@ -900,53 +910,53 @@ class XpanelAgent:
             if not stats:
                 return False
                 
-            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/heartbeat"
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
             response = requests.post(
                 url,
                 json=stats,
                 timeout=10,
-                headers={{'Content-Type': 'application/json'}}
+                headers={'Content-Type': 'application/json'}
             )
             
             if response.status_code == 200:
                 self.logger.debug("Heartbeat sent successfully")
                 return True
             else:
-                self.logger.warning(f"Heartbeat failed: {{response.status_code}}")
+                self.logger.warning(f"Heartbeat failed: {response.status_code}")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Error sending heartbeat: {{e}}")
+            self.logger.error(f"Error sending heartbeat: {e}")
             return False
     
     def register_with_panel(self):
         try:
-            server_info = {{
+            server_info = {
                 'server_id': self.server_id,
                 'hostname': socket.gethostname(),
                 'ip_address': self.get_local_ip(),
                 'os_info': self.get_os_info(),
                 'agent_version': '1.0.0',
                 'timestamp': datetime.now().isoformat()
-            }}
+            }
             
-            url = f"http://{{self.panel_address}}:{{self.panel_port}}/api/agent/register"
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/register"
             response = requests.post(
                 url,
                 json=server_info,
                 timeout=10,
-                headers={{'Content-Type': 'application/json'}}
+                headers={'Content-Type': 'application/json'}
             )
             
             if response.status_code == 200:
                 self.logger.info("Successfully registered with control panel")
                 return True
             else:
-                self.logger.error(f"Registration failed: {{response.status_code}}")
+                self.logger.error(f"Registration failed: {response.status_code}")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Error registering with panel: {{e}}")
+            self.logger.error(f"Error registering with panel: {e}")
             return False
     
     def get_local_ip(self):
@@ -962,15 +972,15 @@ class XpanelAgent:
     def get_os_info(self):
         try:
             import platform
-            return {{
+            return {
                 'system': platform.system(),
                 'release': platform.release(),
                 'version': platform.version(),
                 'machine': platform.machine(),
                 'processor': platform.processor()
-            }}
+            }
         except:
-            return {{'system': 'Unknown'}}
+            return {'system': 'Unknown'}
     
     def heartbeat_loop(self):
         while self.running:
@@ -978,8 +988,8 @@ class XpanelAgent:
             time.sleep(self.heartbeat_interval)
     
     def start(self):
-        self.logger.info(f"Starting Xpanel Agent (ID: {{self.server_id}})")
-        self.logger.info(f"Panel address: {{self.panel_address}}:{{self.panel_port}}")
+        self.logger.info(f"Starting Xpanel Agent (ID: {self.server_id})")
+        self.logger.info(f"Panel address: {self.panel_address}:{self.panel_port}")
         
         if not self.register_with_panel():
             self.logger.error("Failed to register with panel, continuing anyway...")
@@ -1051,7 +1061,7 @@ else
 fi
 
 print_status "Installation completed successfully!"
-echo -e "${{GREEN}}Agent is now running and sending data to panel${{NC}}"
+echo -e "${GREEN}Agent is now running and sending data to panel${NC}"
 '''
 
         # Read agent script content
@@ -1096,7 +1106,7 @@ class XpanelAgent:
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('/var/log/xpanel-agent.log'),
+                logging.FileHandler('/opt/xpanel-agent/xpanel-agent.log'),
                 logging.StreamHandler()
             ]
         )

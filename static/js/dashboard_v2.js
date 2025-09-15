@@ -32,6 +32,11 @@ class DashboardV2 {
             this.loadDashboardData();
             this.initializeCharts();
             
+            // Интеграция с системой реального мониторинга
+            if (typeof realMonitoring !== 'undefined') {
+                console.log('Интеграция с системой реального мониторинга');
+            }
+            
         } catch (error) {
             console.error('Dashboard initialization error:', error);
             this.showNotification('Ошибка инициализации панели', 'error');
