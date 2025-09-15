@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initDashboard() {
     // Check authentication
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('xpanel_token');
     if (!token) {
         window.location.href = '/login';
         return;
@@ -245,6 +245,7 @@ function loadServers() {
         if (response.status === 422 || response.status === 401) {
             // Token expired or invalid, redirect to login
             localStorage.removeItem('token');
+            localStorage.removeItem('xpanel_token');
             window.location.href = '/login';
             return;
         }
@@ -443,6 +444,7 @@ function removeServer(serverId) {
 
 function logout() {
     localStorage.removeItem('token');
+    localStorage.removeItem('xpanel_token');
     window.location.href = '/login';
 }
 
@@ -670,6 +672,7 @@ function loadCustomActions() {
         if (response.status === 422 || response.status === 401) {
             // Token expired or invalid, redirect to login
             localStorage.removeItem('token');
+            localStorage.removeItem('xpanel_token');
             window.location.href = '/login';
             return;
         }

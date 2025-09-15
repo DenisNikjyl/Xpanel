@@ -174,9 +174,12 @@ class MonitoringManager {
     }
 
     setupWebSocketHandlers() {
-        ws.on('system_stats', (data) => {
-            this.updateCharts(data);
-        });
+        // WebSocket handlers will be set up when WebSocket is enabled
+        if (typeof ws !== 'undefined' && ws) {
+            ws.on('system_stats', (data) => {
+                this.updateCharts(data);
+            });
+        }
     }
 
     updateCharts(stats) {
