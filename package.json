@@ -4,13 +4,9 @@
   "description": "Xpanel - VPS Management System with auto-installation and real-time monitoring",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "client": "cd client && npm start",
-    "build": "cd client && npm run build",
-    "install-all": "npm install && cd client && npm install",
-    "start-both": "concurrently \"npm run dev\" \"npm run client\"",
-    "postinstall": "cd client && npm install"
+    "start": "node server/simple-server.js",
+    "dev": "nodemon server/simple-server.js",
+    "simple": "node server/simple-server.js"
   },
   "keywords": [
     "vps",

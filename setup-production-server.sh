@@ -43,20 +43,17 @@ print_header "2. Installing Node.js dependencies..."
 cd /root/Xpanels/server
 npm install --production
 
-print_header "3. Building React client..."
-cd /root/Xpanels/client
-npm install
-# Create production .env for React
-cat > .env << EOF
-REACT_APP_API_URL=http://64.188.70.12:3001
-REACT_APP_WS_URL=ws://64.188.70.12:3001
-GENERATE_SOURCEMAP=false
-EOF
-npm run build
-if [ -d "build" ]; then
-    print_status "React client built successfully"
+print_header "3. Checking static files..."
+if [ -d "/root/Xpanels/public" ]; then
+    print_status "Static files found in /public directory"
+    if [ -f "/root/Xpanels/public/index.html" ]; then
+        print_status "index.html found"
+    else
+        print_error "index.html not found in /public"
+        exit 1
+    fi
 else
-    print_error "Failed to build React client"
+    print_error "/public directory not found"
     exit 1
 fi
 cd /root/Xpanels/server
@@ -91,7 +88,7 @@ mkdir -p uploads
 chmod 755 uploads
 
 print_header "6. Starting Xpanel with PM2..."
-pm2 start index.js --name "xpanel" --env production
+pm2 start simple-server.js --name "xpanel" --env production
 
 print_header "7. Setting up PM2 startup..."
 pm2 startup

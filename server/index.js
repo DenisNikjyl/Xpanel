@@ -23,7 +23,7 @@ const io = socketIo(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client/build')));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // In-memory storage (replace with database in production)
 let users = [];
@@ -1257,44 +1257,47 @@ app.get('/api/system/stats', authenticateToken, (req, res) => {
   }
 });
 
-// Serve React app
+// Catch all handler: send back index.html file.
 app.get('*', (req, res) => {
-  const buildPath = path.join(__dirname, '../client/build/index.html');
-  
-  // Always serve production build or show error
-  if (fs.existsSync(buildPath)) {
-    res.sendFile(buildPath);
+  const indexPath = path.join(__dirname, '../public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
   } else {
-    res.status(500).send(`
-      <!DOCTYPE html>
+    res.status(404).send(`
       <html>
         <head>
-          <title>Xpanel - Build Required</title>
+          <title>Xpanel - Not Found</title>
           <style>
             body { 
-              font-family: Arial, sans-serif; 
-              background: #0a0a0a; 
-              color: #ffffff; 
+              font-family: Arial; 
               text-align: center; 
               padding: 50px; 
+              background: #1a1a1a; 
+              color: #fff; 
             }
             .container { 
-              max-width: 600px; 
+              max-width: 500px; 
               margin: 0 auto; 
-              background: #1e1e2e; 
+              background: #2d2d2d; 
               padding: 40px; 
               border-radius: 12px; 
               border: 1px solid #ff4444; 
             }
             h1 { color: #ff4444; }
             .error { color: #ff4444; margin: 20px 0; }
+            code { background: #000; padding: 5px; border-radius: 3px; }
           </style>
         </head>
         <body>
           <div class="container">
-            <h1>⚠️ Client Build Not Found</h1>
-            <div class="error">Please build the client application first</div>
-            <p>Run: <code>cd client && npm run build</code></p>
+            <h1>⚠️ Xpanel Files Not Found</h1>
+            <div class="error">Static files not found in /public directory</div>
+            <p>Please ensure the following files exist:</p>
+            <ul style="text-align: left;">
+              <li>/public/index.html</li>
+              <li>/public/style.css</li>
+              <li>/public/script.js</li>
+            </ul>
           </div>
         </body>
       </html>
