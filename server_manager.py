@@ -1,0 +1,529 @@
+"""
+Server Manager - Handles VPS server connections and operations
+"""
+
+import paramiko
+import psutil
+import json
+import uuid
+from datetime import datetime
+import threading
+import time
+
+class ServerManager:
+    def __init__(self):
+        self.servers = {}
+        self.connections = {}
+        
+    def add_server(self, name, host, port=22, username=None, password=None, key_file=None):
+        """Add a new server to management"""
+        server_id = str(uuid.uuid4())
+        
+        server_config = {
+            'id': server_id,
+            'name': name,
+            'host': host,
+            'port': port,
+            'username': username,
+            'password': password,
+            'key_file': key_file,
+            'status': 'disconnected',
+            'added_at': datetime.now().isoformat(),
+            'last_seen': None
+        }
+        
+        self.servers[server_id] = server_config
+        return server_id
+    
+    def get_all_servers(self):
+        """Get list of all servers"""
+        return list(self.servers.values())
+    
+    def get_server_ids(self):
+        """Get list of server IDs"""
+        return list(self.servers.keys())
+    
+    def connect_to_server(self, server_id):
+        """Establish SSH connection to server"""
+        if server_id not in self.servers:
+            return False
+            
+        server = self.servers[server_id]
+        
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if server.get('key_file'):
+                # Use key file authentication
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    key_filename=server['key_file']
+                )
+            else:
+                # Use password authentication
+                ssh.connect(
+                    hostname=server['host'],
+                    port=server['port'],
+                    username=server['username'],
+                    password=server['password']
+                )
+            
+            self.connections[server_id] = ssh
+            self.servers[server_id]['status'] = 'connected'
+            self.servers[server_id]['last_seen'] = datetime.now().isoformat()
+            return True
+            
+        except Exception as e:
+            print(f"Failed to connect to server {server_id}: {e}")
+            self.servers[server_id]['status'] = 'error'
+            return False
+    
+    def disconnect_from_server(self, server_id):
+        """Disconnect from server"""
+        if server_id in self.connections:
+            self.connections[server_id].close()
+            del self.connections[server_id]
+            self.servers[server_id]['status'] = 'disconnected'
+    
+    def execute_command(self, server_id, command):
+        """Execute command on remote server"""
+        if server_id not in self.connections:
+            if not self.connect_to_server(server_id):
+                return {'success': False, 'error': 'Failed to connect to server'}
+        
+        try:
+            ssh = self.connections[server_id]
+            stdin, stdout, stderr = ssh.exec_command(command)
+            
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+            exit_code = stdout.channel.recv_exit_status()
+            
+            return {
+                'success': True,
+                'output': output,
+                'error': error,
+                'exit_code': exit_code,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def get_server_stats(self, server_id):
+        """Get server system statistics"""
+        if server_id not in self.servers:
+            return {'error': 'Server not found'}
+        
+        # Try to get stats via SSH command
+        commands = {
+            'cpu': "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1",
+            'memory': "free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2}'",
+            'disk': "df -h / | awk 'NR==2{print $5}' | cut -d'%' -f1",
+            'uptime': "uptime -p",
+            'load': "uptime | awk -F'load average:' '{print $2}'"
+        }
+        
+        stats = {
+            'server_id': server_id,
+            'timestamp': datetime.now().isoformat(),
+            'status': self.servers[server_id]['status']
+        }
+        
+        if server_id in self.connections or self.connect_to_server(server_id):
+            for stat_name, command in commands.items():
+                result = self.execute_command(server_id, command)
+                if result['success']:
+                    stats[stat_name] = result['output'].strip()
+                else:
+                    stats[stat_name] = 'N/A'
+        else:
+            # Server not connected, return placeholder data
+            stats.update({
+                'cpu': 'N/A',
+                'memory': 'N/A',
+                'disk': 'N/A',
+                'uptime': 'N/A',
+                'load': 'N/A'
+            })
+        
+        return stats
+    
+    def get_server_files(self, server_id, path='/'):
+        """Get file listing from server"""
+        command = f"ls -la {path}"
+        result = self.execute_command(server_id, command)
+        
+        if result['success']:
+            files = []
+            lines = result['output'].strip().split('\n')[1:]  # Skip first line (total)
+            
+            for line in lines:
+                if line.strip():
+                    parts = line.split()
+                    if len(parts) >= 9:
+                        files.append({
+                            'permissions': parts[0],
+                            'size': parts[4],
+                            'modified': ' '.join(parts[5:8]),
+                            'name': ' '.join(parts[8:]),
+                            'is_directory': parts[0].startswith('d')
+                        })
+            
+            return {'success': True, 'files': files, 'path': path}
+        
+        return result
+    
+    def remove_server(self, server_id):
+        """Remove server from management"""
+        if server_id in self.connections:
+            self.disconnect_from_server(server_id)
+        
+        if server_id in self.servers:
+            del self.servers[server_id]
+            return True
+        
+        return False
+
+    def install_agent_remote(self, host, port=22, username=None, password=None, key_file=None, panel_address="64.188.70.12"):
+        """Automatically install agent on remote server via SSH"""
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            # Connect to server
+            if key_file:
+                ssh.connect(hostname=host, port=port, username=username, key_filename=key_file)
+            else:
+                ssh.connect(hostname=host, port=port, username=username, password=password)
+            
+            # Generate installation script
+            install_script = self.generate_install_script(panel_address)
+            
+            # Upload and execute installation script
+            steps = []
+            
+            # Step 1: Create temporary script file
+            steps.append("Creating installation script...")
+            stdin, stdout, stderr = ssh.exec_command("mktemp")
+            script_path = stdout.read().decode().strip()
+            
+            if stderr.read():
+                raise Exception("Failed to create temporary file")
+            
+            # Step 2: Upload script content
+            steps.append("Uploading installation script...")
+            sftp = ssh.open_sftp()
+            with sftp.file(script_path, 'w') as f:
+                f.write(install_script)
+            sftp.close()
+            
+            # Step 3: Make script executable
+            steps.append("Making script executable...")
+            stdin, stdout, stderr = ssh.exec_command(f"chmod +x {script_path}")
+            stdout.read()  # Wait for completion
+            
+            # Step 4: Execute installation script
+            steps.append("Executing installation script...")
+            stdin, stdout, stderr = ssh.exec_command(f"sudo {script_path} --panel-address {panel_address}")
+            
+            output = stdout.read().decode()
+            error = stderr.read().decode()
+            exit_code = stdout.channel.recv_exit_status()
+            
+            # Step 5: Cleanup
+            steps.append("Cleaning up...")
+            ssh.exec_command(f"rm -f {script_path}")
+            
+            ssh.close()
+            
+            if exit_code == 0:
+                return {
+                    'success': True,
+                    'message': 'Agent installed successfully',
+                    'steps': steps,
+                    'output': output
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Installation failed with exit code {exit_code}',
+                    'output': output,
+                    'stderr': error
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'SSH connection failed: {str(e)}'
+            }
+
+    def generate_install_script(self, panel_address):
+        """Generate agent installation script"""
+        script_template = '''#!/bin/bash
+
+# Xpanel Agent Auto-Installation Script
+# Generated automatically by Xpanel Control Panel
+
+set -e
+
+# Colors for output
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+NC='\\033[0m' # No Color
+
+# Configuration
+AGENT_USER="xpanel-agent"
+AGENT_DIR="/opt/xpanel-agent"
+SERVICE_NAME="xpanel-agent"
+PANEL_ADDRESS="{panel_address}"
+PANEL_PORT="5000"
+
+echo -e "${{BLUE}}========================================${{NC}}"
+echo -e "${{BLUE}}    Xpanel Agent Auto-Installation${{NC}}"
+echo -e "${{BLUE}}========================================${{NC}}"
+
+# Function to print status
+print_status() {{
+    echo -e "${{GREEN}}[INFO]${{NC}} $1"
+}}
+
+print_warning() {{
+    echo -e "${{YELLOW}}[WARNING]${{NC}} $1"
+}}
+
+print_error() {{
+    echo -e "${{RED}}[ERROR]${{NC}} $1"
+}}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   print_error "This script must be run as root (use sudo)"
+   exit 1
+fi
+
+# Detect package manager and install dependencies
+print_status "Installing dependencies..."
+if command -v apt-get &> /dev/null; then
+    apt-get update
+    apt-get install -y python3 python3-pip curl
+elif command -v yum &> /dev/null; then
+    yum install -y python3 python3-pip curl
+elif command -v dnf &> /dev/null; then
+    dnf install -y python3 python3-pip curl
+else
+    print_error "Unsupported package manager"
+    exit 1
+fi
+
+# Install Python packages
+print_status "Installing Python packages..."
+pip3 install psutil requests
+
+# Create agent user
+print_status "Creating agent user..."
+if ! id "$AGENT_USER" &>/dev/null; then
+    useradd -r -s /bin/false -d "$AGENT_DIR" "$AGENT_USER"
+fi
+
+# Create agent directory
+print_status "Creating agent directory..."
+mkdir -p "$AGENT_DIR"
+chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR"
+
+# Create agent script
+print_status "Creating agent script..."
+cat > "$AGENT_DIR/xpanel_agent.py" << 'AGENT_EOF'
+{agent_script}
+AGENT_EOF
+
+chmod +x "$AGENT_DIR/xpanel_agent.py"
+chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/xpanel_agent.py"
+
+# Create systemd service
+print_status "Creating systemd service..."
+cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+[Unit]
+Description=Xpanel VPS Agent
+After=network.target
+
+[Service]
+Type=simple
+User=$AGENT_USER
+Group=$AGENT_USER
+WorkingDirectory=$AGENT_DIR
+ExecStart=/usr/bin/python3 $AGENT_DIR/xpanel_agent.py --panel-address $PANEL_ADDRESS --panel-port $PANEL_PORT
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create log file
+print_status "Setting up logging..."
+touch /var/log/xpanel-agent.log
+chown "$AGENT_USER:$AGENT_USER" /var/log/xpanel-agent.log
+
+# Start service
+print_status "Starting agent service..."
+systemctl daemon-reload
+systemctl enable $SERVICE_NAME
+systemctl start $SERVICE_NAME
+
+# Check service status
+sleep 3
+if systemctl is-active --quiet $SERVICE_NAME; then
+    print_status "Xpanel agent installed and started successfully!"
+    echo -e "${{GREEN}}Agent is now sending data to: $PANEL_ADDRESS:$PANEL_PORT${{NC}}"
+else
+    print_error "Agent service failed to start"
+    systemctl status $SERVICE_NAME
+    exit 1
+fi
+
+echo -e "${{GREEN}}========================================${{NC}}"
+echo -e "${{GREEN}}    Installation Complete!${{NC}}"
+echo -e "${{GREEN}}========================================${{NC}}"
+'''
+
+        # Read agent script content
+        agent_script_path = "agent/xpanel_agent.py"
+        try:
+            with open(agent_script_path, 'r', encoding='utf-8') as f:
+                agent_script = f.read()
+        except FileNotFoundError:
+            # Fallback agent script if file not found
+            agent_script = self.get_fallback_agent_script()
+
+        return script_template.format(
+            panel_address=panel_address,
+            agent_script=agent_script
+        )
+
+    def get_fallback_agent_script(self):
+        """Fallback agent script content"""
+        return '''#!/usr/bin/env python3
+import os
+import sys
+import time
+import json
+import psutil
+import socket
+import requests
+import subprocess
+import threading
+from datetime import datetime
+import argparse
+import logging
+
+class XpanelAgent:
+    def __init__(self, panel_address="64.188.70.12", panel_port=5000):
+        self.panel_address = panel_address
+        self.panel_port = panel_port
+        self.server_id = self.generate_server_id()
+        self.running = False
+        self.heartbeat_interval = 30
+        
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('/var/log/xpanel-agent.log'),
+                logging.StreamHandler()
+            ]
+        )
+        self.logger = logging.getLogger(__name__)
+        
+    def generate_server_id(self):
+        hostname = socket.gethostname()
+        try:
+            import uuid
+            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
+                           for elements in range(0,2*6,2)][::-1])
+            return f"{hostname}-{mac}"
+        except:
+            return hostname
+    
+    def get_system_stats(self):
+        try:
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            network = psutil.net_io_counters()
+            
+            return {
+                'server_id': self.server_id,
+                'timestamp': datetime.now().isoformat(),
+                'cpu': {'usage': cpu_percent, 'cores': psutil.cpu_count()},
+                'memory': {
+                    'total': memory.total,
+                    'used': memory.used,
+                    'percent': memory.percent
+                },
+                'disk': {
+                    'total': disk.total,
+                    'used': disk.used,
+                    'percent': (disk.used / disk.total) * 100
+                },
+                'network': {
+                    'bytes_sent': network.bytes_sent,
+                    'bytes_recv': network.bytes_recv
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Error collecting stats: {e}")
+            return None
+    
+    def send_heartbeat(self):
+        try:
+            stats = self.get_system_stats()
+            if not stats:
+                return False
+                
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
+            response = requests.post(url, json=stats, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            self.logger.error(f"Heartbeat error: {e}")
+            return False
+    
+    def heartbeat_loop(self):
+        while self.running:
+            self.send_heartbeat()
+            time.sleep(self.heartbeat_interval)
+    
+    def start(self):
+        self.logger.info(f"Starting Xpanel Agent (ID: {self.server_id})")
+        self.running = True
+        
+        heartbeat_thread = threading.Thread(target=self.heartbeat_loop, daemon=True)
+        heartbeat_thread.start()
+        
+        try:
+            while self.running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.stop()
+    
+    def stop(self):
+        self.running = False
+        self.logger.info("Agent stopped")
+
+def main():
+    parser = argparse.ArgumentParser(description='Xpanel VPS Agent')
+    parser.add_argument('--panel-address', default='64.188.70.12')
+    parser.add_argument('--panel-port', type=int, default=5000)
+    args = parser.parse_args()
+    
+    agent = XpanelAgent(args.panel_address, args.panel_port)
+    agent.start()
+
+if __name__ == '__main__':
+    main()
+'''

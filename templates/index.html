@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Xpanel{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-server"></i>
+                <span>Xpanel</span>
+            </div>
+        </div>
+        
+        <div class="nav-center">
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Dashboard
+                </a>
+                <a href="#servers" class="nav-item" data-section="servers">
+                    <i class="fas fa-server"></i>
+                    Серверы
+                </a>
+                <a href="#terminal" class="nav-item" data-section="terminal">
+                    <i class="fas fa-terminal"></i>
+                    Терминал
+                </a>
+                <a href="#files" class="nav-item" data-section="files">
+                    <i class="fas fa-folder"></i>
+                    Файлы
+                </a>
+                <a href="#monitoring" class="nav-item" data-section="monitoring">
+                    <i class="fas fa-chart-line"></i>
+                    Мониторинг
+                </a>
+            </nav>
+        </div>
+        
+        <div class="nav-right">
+            <div class="user-menu">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="username" id="current-user">Admin</span>
+                    <div class="user-dropdown">
+                        <a href="#settings"><i class="fas fa-cog"></i> Настройки</a>
+                        <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выход</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="content-section active">
+            <div class="section-header">
+                <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt"></i> Обновить
+                    </button>
+                </div>
+            </div>
+            
+            <!-- System Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon cpu">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>CPU</h3>
+                        <div class="stat-value" id="cpu-usage">0%</div>
+                        <div class="stat-label">Загрузка процессора</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon memory">
+                        <i class="fas fa-memory"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>RAM</h3>
+                        <div class="stat-value" id="memory-usage">0%</div>
+                        <div class="stat-label">Использование памяти</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon disk">
+                        <i class="fas fa-hdd"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Диск</h3>
+                        <div class="stat-value" id="disk-usage">0%</div>
+                        <div class="stat-label">Использование диска</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon network">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Сеть</h3>
+                        <div class="stat-value" id="network-usage">0 MB/s</div>
+                        <div class="stat-label">Сетевая активность</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Servers Overview -->
+            <div class="servers-overview">
+                <h3><i class="fas fa-server"></i> Обзор серверов</h3>
+                <div class="servers-grid" id="servers-grid">
+                    <!-- Servers will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Servers Section -->
+        <section id="servers-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-server"></i> Управление серверами</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="showAddServerModal()">
+                        <i class="fas fa-plus"></i> Добавить сервер
+                    </button>
+                </div>
+            </div>
+            
+            <div class="servers-list" id="servers-list">
+                <!-- Servers list will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Terminal Section -->
+        <section id="terminal-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-terminal"></i> Терминал</h2>
+                <div class="header-actions">
+                    <select id="terminal-server-select" class="server-select">
+                        <option value="">Выберите сервер</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="terminal-container">
+                <div class="terminal-output" id="terminal-output"></div>
+                <div class="terminal-input-container">
+                    <span class="terminal-prompt" id="terminal-prompt">$</span>
+                    <input type="text" id="terminal-input" class="terminal-input" placeholder="Введите команду...">
+                </div>
+            </div>
+        </section>
+
+        <!-- Files Section -->
+        <section id="files-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-folder"></i> Файловый менеджер</h2>
+                <div class="header-actions">
+                    <select id="files-server-select" class="server-select">
+                        <option value="">Выберите сервер</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="refreshFiles()">
+                        <i class="fas fa-sync-alt"></i> Обновить
+                    </button>
+                </div>
+            </div>
+            
+            <div class="file-manager">
+                <div class="file-path">
+                    <span id="current-path">/</span>
+                </div>
+                <div class="files-list" id="files-list">
+                    <!-- Files will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Monitoring Section -->
+        <section id="monitoring-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-chart-line"></i> Мониторинг</h2>
+            </div>
+            
+            <div class="monitoring-grid">
+                <div class="chart-container">
+                    <canvas id="cpu-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="memory-chart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Add Server Modal -->
+<div id="add-server-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Добавить новый сервер</h3>
+            <button class="modal-close" onclick="closeAddServerModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Installation Method Selection -->
+            <div class="installation-method">
+                <h4>Способ установки агента:</h4>
+                <div class="method-tabs">
+                    <button type="button" class="method-tab active" onclick="switchInstallMethod('auto')">
+                        <i class="fas fa-magic"></i>
+                        Автоматическая установка
+                    </button>
+                    <button type="button" class="method-tab" onclick="switchInstallMethod('manual')">
+                        <i class="fas fa-terminal"></i>
+                        Ручная установка
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto Installation Form -->
+            <form id="auto-install-form" class="install-form active">
+                <div class="form-group">
+                    <label for="auto-server-name">
+                        <i class="fas fa-server"></i>
+                        Название сервера
+                    </label>
+                    <input type="text" id="auto-server-name" required placeholder="Мой VPS сервер">
+                </div>
+                <div class="form-group">
+                    <label for="auto-server-host">
+                        <i class="fas fa-globe"></i>
+                        IP адрес или домен
+                    </label>
+                    <input type="text" id="auto-server-host" required placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label for="auto-server-port">
+                        <i class="fas fa-plug"></i>
+                        Порт SSH
+                    </label>
+                    <input type="number" id="auto-server-port" value="22" required>
+                </div>
+                <div class="form-group">
+                    <label for="auto-server-username">
+                        <i class="fas fa-user"></i>
+                        Имя пользователя (root или sudo)
+                    </label>
+                    <input type="text" id="auto-server-username" required placeholder="root">
+                </div>
+                <div class="form-group">
+                    <label for="auto-server-password">
+                        <i class="fas fa-lock"></i>
+                        Пароль
+                    </label>
+                    <input type="password" id="auto-server-password" required placeholder="Пароль для SSH">
+                </div>
+                <div class="form-group">
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>Автоматическая установка:</strong>
+                            <p>Xpanel подключится к серверу по SSH и автоматически установит агент. Требуются права root или sudo.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddServerModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-download"></i>
+                        Установить агент автоматически
+                    </button>
+                </div>
+            </form>
+
+            <!-- Manual Installation Instructions -->
+            <div id="manual-install-form" class="install-form">
+                <div class="form-group">
+                    <label for="manual-server-name">
+                        <i class="fas fa-server"></i>
+                        Название сервера
+                    </label>
+                    <input type="text" id="manual-server-name" required placeholder="Мой VPS сервер">
+                </div>
+                <div class="manual-instructions">
+                    <h4><i class="fas fa-list-ol"></i> Инструкция по установке:</h4>
+                    
+                    <div class="instruction-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h5>Подключитесь к серверу по SSH:</h5>
+                            <div class="code-block">
+                                <code>ssh root@your-server-ip</code>
+                                <button class="copy-btn" onclick="copyToClipboard('ssh root@your-server-ip')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h5>Скачайте и запустите скрипт установки:</h5>
+                            <div class="code-block">
+                                <code id="install-command">curl -sSL http://your-panel-ip:5000/api/agent/install-script | sudo bash</code>
+                                <button class="copy-btn" onclick="copyInstallCommand()">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h5>Проверьте статус агента:</h5>
+                            <div class="code-block">
+                                <code>systemctl status xpanel-agent</code>
+                                <button class="copy-btn" onclick="copyToClipboard('systemctl status xpanel-agent')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h5>Добавьте сервер в панель:</h5>
+                            <p>После успешной установки агента нажмите кнопку ниже, чтобы добавить сервер в панель управления.</p>
+                        </div>
+                    </div>
+
+                    <div class="download-section">
+                        <h5><i class="fas fa-download"></i> Альтернативный способ:</h5>
+                        <p>Скачайте скрипт установки и запустите вручную:</p>
+                        <button class="btn btn-secondary" onclick="downloadInstallScript()">
+                            <i class="fas fa-download"></i>
+                            Скачать install_agent.sh
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddServerModal()">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addManualServer()">
+                        <i class="fas fa-plus"></i>
+                        Добавить сервер в панель
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Installation Progress Modal -->
+<div id="install-progress-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Установка агента</h3>
+        </div>
+        <div class="modal-body">
+            <div class="progress-container">
+                <div class="progress-step active" id="step-connecting">
+                    <div class="step-icon">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <div class="step-text">Подключение к серверу...</div>
+                </div>
+                <div class="progress-step" id="step-uploading">
+                    <div class="step-icon">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <div class="step-text">Загрузка скрипта установки...</div>
+                </div>
+                <div class="progress-step" id="step-installing">
+                    <div class="step-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <div class="step-text">Установка агента...</div>
+                </div>
+                <div class="progress-step" id="step-starting">
+                    <div class="step-icon">
+                        <i class="fas fa-play"></i>
+                    </div>
+                    <div class="step-text">Запуск сервиса...</div>
+                </div>
+                <div class="progress-step" id="step-complete">
+                    <div class="step-icon">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="step-text">Установка завершена!</div>
+                </div>
+            </div>
+            <div class="installation-output">
+                <h5>Вывод установки:</h5>
+                <div class="output-console" id="install-output"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary" onclick="closeInstallProgress()" id="close-install-btn" style="display: none;">
+                Закрыть
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div id="connection-status" class="connection-status">
+    <i class="fas fa-circle"></i>
+    <span>Подключено</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/servers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/terminal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/files.js') }}"></script>
+<script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+<script src="{{ url_for('static', filename='js/agent_installer.js') }}"></script>
+{% endblock %}
