@@ -53,7 +53,8 @@ class ServersManager {
             });
 
             if (response.ok) {
-                this.servers = await response.json();
+                const data = await response.json();
+                this.servers = Array.isArray(data) ? data : (data.servers || []);
                 this.renderServers();
                 this.updateStats();
             } else if (response.status === 401) {
@@ -514,23 +515,32 @@ class ServersManager {
 
             if (response.ok) {
                 const stats = await response.json();
-                this.updateStatsCards(stats);
+                this.updateStats(stats);
             }
         } catch (error) {
             console.error('Failed to load stats:', error);
         }
     }
 
-    updateStats() {
-        const totalServers = this.servers.length;
-        const onlineServers = this.servers.filter(s => s.status === 'online').length;
-        const offlineServers = this.servers.filter(s => s.status === 'offline').length;
-        const agentsInstalled = this.servers.filter(s => s.agent_status === 'installed').length;
+    updateStats(stats = null) {
+        if (stats) {
+            // Use stats from API if provided
+            document.getElementById('total-servers')?.textContent = stats.total_servers || 0;
+            document.getElementById('online-servers')?.textContent = stats.online_servers || 0;
+            document.getElementById('offline-servers')?.textContent = stats.offline_servers || 0;
+            document.getElementById('agents-installed')?.textContent = stats.agents_installed || 0;
+        } else {
+            // Calculate from local servers data
+            const totalServers = this.servers.length;
+            const onlineServers = this.servers.filter(s => s.status === 'online').length;
+            const offlineServers = this.servers.filter(s => s.status === 'offline').length;
+            const agentsInstalled = this.servers.filter(s => s.agent_status === 'installed').length;
 
-        document.getElementById('total-servers').textContent = totalServers;
-        document.getElementById('online-servers').textContent = onlineServers;
-        document.getElementById('offline-servers').textContent = offlineServers;
-        document.getElementById('agents-installed').textContent = agentsInstalled;
+            document.getElementById('total-servers')?.textContent = totalServers;
+            document.getElementById('online-servers')?.textContent = onlineServers;
+            document.getElementById('offline-servers')?.textContent = offlineServers;
+            document.getElementById('agents-installed')?.textContent = agentsInstalled;
+        }
     }
 
     startRealTimeUpdates() {
