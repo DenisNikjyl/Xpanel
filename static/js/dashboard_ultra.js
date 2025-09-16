@@ -22,8 +22,50 @@ class UltraDashboard {
             item.addEventListener('click', (e) => this.handleNavigation(e));
         });
 
-        // Header actions
-        document.getElementById('add-server-btn')?.addEventListener('click', () => this.showAddServerModal());
+        // Add server button
+        const addServerBtn = document.getElementById('add-server-btn');
+        if (addServerBtn) {
+            addServerBtn.addEventListener('click', () => this.showAddServerModal());
+        }
+
+        // Modal close buttons
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Modal backdrop clicks
+        document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+            backdrop.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Add server form submission
+        const addServerForm = document.getElementById('server-form');
+        if (addServerForm) {
+            addServerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleAddServer(e);
+            });
+        }
+
+        // Edit server form submission
+        const editServerForm = document.getElementById('edit-server-form');
+        if (editServerForm) {
+            editServerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEditServer(e);
+            });
+        }
+
         document.getElementById('refresh-btn')?.addEventListener('click', () => this.refreshDashboard());
         document.getElementById('notifications-btn')?.addEventListener('click', () => this.toggleNotifications());
 
@@ -1038,7 +1080,7 @@ class UltraDashboard {
     }
 
     async deleteServer(serverId) {
-        if (!confirm('Are you sure you want to delete this server?')) return;
+        if (!confirm('Вы уверены, что хотите удалить этот сервер?')) return;
         
         try {
             const response = await fetch(`/api/servers/${serverId}`, {
@@ -1049,14 +1091,86 @@ class UltraDashboard {
             });
 
             if (response.ok) {
-                this.showNotification('Server deleted successfully', 'success');
+                this.showNotification('Сервер успешно удален', 'success');
                 await this.loadServers();
             } else {
-                this.showNotification('Failed to delete server', 'error');
+                this.showNotification('Ошибка удаления сервера', 'error');
             }
         } catch (error) {
             console.error('Failed to delete server:', error);
-            this.showNotification('Failed to delete server', 'error');
+            this.showNotification('Ошибка удаления сервера', 'error');
+        }
+    }
+
+    async handleAddServer(event) {
+        const formData = new FormData(event.target);
+        const serverData = {
+            name: formData.get('name'),
+            host: formData.get('host'),
+            port: parseInt(formData.get('port')),
+            username: formData.get('username'),
+            password: formData.get('password'),
+            description: formData.get('description')
+        };
+
+        try {
+            const response = await fetch('/api/servers', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(serverData)
+            });
+
+            if (response.ok) {
+                this.showNotification('Сервер успешно добавлен', 'success');
+                document.getElementById('add-server-modal').classList.remove('active');
+                event.target.reset();
+                await this.loadServers();
+            } else {
+                const error = await response.json();
+                this.showNotification(error.message || 'Ошибка добавления сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to add server:', error);
+            this.showNotification('Ошибка добавления сервера', 'error');
+        }
+    }
+
+    async handleEditServer(event) {
+        const formData = new FormData(event.target);
+        const serverId = event.target.dataset.serverId;
+        const serverData = {
+            name: formData.get('name'),
+            host: formData.get('host'),
+            port: parseInt(formData.get('port')),
+            username: formData.get('username'),
+            password: formData.get('password'),
+            description: formData.get('description')
+        };
+
+        try {
+            const response = await fetch(`/api/servers/${serverId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(serverData)
+            });
+
+            if (response.ok) {
+                this.showNotification('Сервер успешно обновлен', 'success');
+                document.getElementById('edit-server-modal').classList.remove('active');
+                await this.loadServers();
+            } else {
+                const error = await response.json();
+                this.showNotification(error.message || 'Ошибка обновления сервера', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to update server:', error);
+            this.showNotification('Ошибка обновления сервера', 'error');
         }
     }
 

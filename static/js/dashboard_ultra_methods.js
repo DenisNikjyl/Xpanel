@@ -78,5 +78,39 @@ UltraDashboard.prototype.refreshDashboard = function() {
 };
 
 UltraDashboard.prototype.showAddServerModal = function() {
-    console.log('Show add server modal');
+    const modal = document.getElementById('add-server-modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+};
+
+UltraDashboard.prototype.showEditServerModal = function(serverId) {
+    const modal = document.getElementById('edit-server-modal');
+    if (modal) {
+        // Find server data and populate form
+        const server = this.servers.find(s => s.id === serverId);
+        if (server) {
+            document.getElementById('edit-server-name').value = server.name || '';
+            document.getElementById('edit-server-host').value = server.host || '';
+            document.getElementById('edit-server-port').value = server.port || 22;
+            document.getElementById('edit-server-username').value = server.username || 'root';
+            document.getElementById('edit-server-password').value = '';
+            document.getElementById('edit-server-description').value = server.description || '';
+        }
+        modal.classList.add('active');
+    }
+};
+
+UltraDashboard.prototype.closeModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
+    }
+};
+
+// Global function for HTML onclick
+function closeModal(modalId) {
+    if (window.dashboard) {
+        window.dashboard.closeModal(modalId);
+    }
 };
