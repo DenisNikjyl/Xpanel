@@ -313,10 +313,10 @@ class ServersManager {
         const server = this.servers.find(s => s.id === serverId);
         if (!server) return;
 
-        this.showInstallationModal(server);
+        await this.showInstallationModal(server);
     }
 
-    showInstallationModal(server) {
+    async showInstallationModal(server) {
         const modal = document.getElementById('install-agent-modal');
         if (!modal) return;
 
@@ -338,9 +338,9 @@ class ServersManager {
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
 
-        // Prepare real-time socket listeners
+        // Prepare real-time socket listeners (дождёмся подключения сокета)
         this.installingServerId = server.id;
-        this.ensureSocketConnected();
+        await this.ensureSocketConnected();
 
         // Start installation (backend will emit progress over WebSocket)
         this.performAgentInstallation(server);
@@ -409,62 +409,76 @@ class ServersManager {
 
     // Socket.IO real-time installation handlers
     ensureSocketConnected() {
-        try {
-            if (!this.socket && typeof io !== 'undefined') {
-                this.socket = io();
-                // Progress updates
-                this.socket.on('installation_progress', (data) => {
-                    const evId = data && data.server_id != null ? String(data.server_id) : null;
-                    const curId = this.installingServerId != null ? String(this.installingServerId) : null;
-                    if (!curId || evId !== curId) return;
-                    const progressFill = document.getElementById('install-progress-fill');
-                    const progressPercentage = document.getElementById('install-progress-percentage');
-                    if (progressFill && typeof data.progress === 'number') {
-                        progressFill.style.width = `${Math.min(100, Math.max(0, data.progress))}%`;
-                    }
-                    if (progressPercentage && typeof data.progress === 'number') {
-                        progressPercentage.textContent = `${Math.round(data.progress)}%`;
-                    }
-                    // Main message
-                    if (data.step || data.message) {
-                        const line = [data.step, data.message].filter(Boolean).join(' - ');
-                        this.addTerminalLine(line, data.is_error ? 'error' : 'info');
-                    }
-                    // Command output (multi-line)
-                    if (data.command_output && data.command_output.trim()) {
-                        data.command_output.split('\n').forEach(l => {
-                            if (l.trim()) this.addTerminalLine(l, 'info');
-                        });
-                    }
-                });
-                // Completion
-                this.socket.on('installation_complete', (data) => {
-                    const evId = data && data.server_id != null ? String(data.server_id) : null;
-                    const curId = this.installingServerId != null ? String(this.installingServerId) : null;
-                    if (!curId || evId !== curId) return;
-                    const progressFill = document.getElementById('install-progress-fill');
-                    const progressPercentage = document.getElementById('install-progress-percentage');
-                    if (progressFill) progressFill.style.width = '100%';
-                    if (progressPercentage) progressPercentage.textContent = '100%';
-                    if (data.success) {
-                        this.addTerminalLine('[SUCCESS] Agent installed successfully!', 'success');
-                        this.showNotification('Agent installed successfully', 'success');
-                    } else {
-                        this.addTerminalLine(`[ERROR] ${data.error || 'Installation failed'}`, 'error');
-                        this.showNotification('Agent installation failed', 'error');
-                    }
-                    // Enable close button
-                    const closeBtn = document.querySelector('#install-agent-modal .modal-close');
-                    if (closeBtn) closeBtn.disabled = false;
-                    // Refresh servers list
-                    this.loadServers();
-                    // Reset current installation
-                    this.installingServerId = null;
-                });
+        return new Promise((resolve) => {
+            try {
+                if (!this.socket && typeof io !== 'undefined') {
+                    this.socket = io();
+                }
+                if (!this.socket) {
+                    console.error('Socket.IO not available');
+                    return resolve(false);
+                }
+
+                // Регистрируем обработчики один раз
+                if (!this._socketHandlersRegistered) {
+                    this._socketHandlersRegistered = true;
+
+                    this.socket.on('installation_progress', (data) => {
+                        const evId = data && data.server_id != null ? String(data.server_id) : null;
+                        const curId = this.installingServerId != null ? String(this.installingServerId) : null;
+                        if (!curId || evId !== curId) return;
+                        const progressFill = document.getElementById('install-progress-fill');
+                        const progressPercentage = document.getElementById('install-progress-percentage');
+                        if (progressFill && typeof data.progress === 'number') {
+                            progressFill.style.width = `${Math.min(100, Math.max(0, data.progress))}%`;
+                        }
+                        if (progressPercentage && typeof data.progress === 'number') {
+                            progressPercentage.textContent = `${Math.round(data.progress)}%`;
+                        }
+                        if (data.step || data.message) {
+                            const line = [data.step, data.message].filter(Boolean).join(' - ');
+                            this.addTerminalLine(line, data.is_error ? 'error' : 'info');
+                        }
+                        if (data.command_output && data.command_output.trim()) {
+                            data.command_output.split('\n').forEach(l => {
+                                if (l.trim()) this.addTerminalLine(l, 'info');
+                            });
+                        }
+                    });
+
+                    this.socket.on('installation_complete', (data) => {
+                        const evId = data && data.server_id != null ? String(data.server_id) : null;
+                        const curId = this.installingServerId != null ? String(this.installingServerId) : null;
+                        if (!curId || evId !== curId) return;
+                        const progressFill = document.getElementById('install-progress-fill');
+                        const progressPercentage = document.getElementById('install-progress-percentage');
+                        if (progressFill) progressFill.style.width = '100%';
+                        if (progressPercentage) progressPercentage.textContent = '100%';
+                        if (data.success) {
+                            this.addTerminalLine('[SUCCESS] Agent installed successfully!', 'success');
+                            this.showNotification('Agent installed successfully', 'success');
+                        } else {
+                            this.addTerminalLine(`[ERROR] ${data.error || 'Installation failed'}`, 'error');
+                            this.showNotification('Agent installation failed', 'error');
+                        }
+                        const closeBtn = document.querySelector('#install-agent-modal .modal-close');
+                        if (closeBtn) closeBtn.disabled = false;
+                        this.loadServers();
+                        this.installingServerId = null;
+                    });
+                }
+
+                if (this.socket.connected) return resolve(true);
+                this.socket.once('connect', () => resolve(true));
+                // fallback на случай мгновенной установки соединения
+                setTimeout(() => {
+                    if (this.socket.connected) resolve(true);
+                }, 100);
+            } catch (err) {
+                console.error('Socket initialization error:', err);
+                resolve(false);
             }
-        } catch (err) {
-            console.error('Socket initialization error:', err);
-        }
+        });
     }
 
     // Utility Functions
