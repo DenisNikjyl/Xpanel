@@ -150,26 +150,35 @@ def install_agent_legacy(server_id):
                 socketio.emit('installation_progress', progress_payload)
             except Exception as e:
                 print(f"Emit progress error: {e}")
-        
-        # Запускаем установку (коллбек будет транслировать прогресс по WebSocket)
-        result = real_installer.install_agent(server_config, progress_callback)
-        
-        if result['success']:
-            # Обновляем статус сервера через server_manager
-            server_manager.update_server_status(server_id, 'online', agent_installed=True)
-        
-        # Отправляем событие завершения установки
-        try:
-            socketio.emit('installation_complete', {
-                'server_id': str(server_id),
-                'success': result.get('success', False),
-                'message': result.get('message'),
-                'error': result.get('error')
-            })
-        except Exception as e:
-            print(f"Emit completion error: {e}")
-        
-        return jsonify(result)
+
+        # Запускаем установку в отдельном потоке, чтобы сразу отдавать ответ клиенту
+        def install_in_background():
+            try:
+                result = real_installer.install_agent(server_config, progress_callback)
+                if result.get('success'):
+                    server_manager.update_server_status(server_id, 'online', agent_installed=True)
+                # Отправляем событие завершения установки
+                try:
+                    socketio.emit('installation_complete', {
+                        'server_id': str(server_id),
+                        'success': result.get('success', False),
+                        'message': result.get('message'),
+                        'error': result.get('error')
+                    })
+                except Exception as e:
+                    print(f"Emit completion error: {e}")
+            except Exception as e:
+                print(f"Background install error: {e}")
+                socketio.emit('installation_complete', {
+                    'server_id': str(server_id),
+                    'success': False,
+                    'error': f'Ошибка установки агента: {str(e)}'
+                })
+
+        threading.Thread(target=install_in_background, daemon=True).start()
+
+        # Немедленный ответ
+        return jsonify({'success': True, 'message': 'Установка агента запущена'})
         
     except Exception as e:
         print(f"Ошибка установки агента: {e}")

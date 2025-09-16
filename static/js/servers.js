@@ -351,9 +351,17 @@ class ServersManager {
         const progressFill = document.getElementById('install-progress-fill');
         const progressPercentage = document.getElementById('install-progress-percentage');
 
+        // Пишем первые шаги сразу, до прихода сокет-логов
+        const port = server.port || 22;
+        const user = server.username || 'root';
         this.addTerminalLine(`[INFO] Starting agent installation on ${server.name}...`, 'info');
-        
-        // Make actual API call immediately - no fake simulation
+        this.addTerminalLine(`root@${server.host}:~# ssh ${user}@${server.host} -p ${port}`, 'info');
+        this.addTerminalLine(`[INFO] Connecting to ${server.host}:${port}...`, 'info');
+        this.addTerminalLine(`[INFO] Authenticating${server.key_file ? ' with SSH key' : ' with password'}...`, 'info');
+        if (progressFill) progressFill.style.width = '5%';
+        if (progressPercentage) progressPercentage.textContent = '5%';
+
+        // Делаем реальный API вызов для старта установки (дальше ждём Socket.IO события)
         try {
             const response = await fetch(`/api/servers/${server.id}/install-agent`, {
                 method: 'POST',
@@ -362,36 +370,18 @@ class ServersManager {
                     'Content-Type': 'application/json'
                 }
             });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Update progress to 100%
-                if (progressFill) progressFill.style.width = '100%';
-                if (progressPercentage) progressPercentage.textContent = '100%';
-                
-                this.addTerminalLine('[SUCCESS] Agent installed successfully!', 'success');
-                this.showNotification('Agent installed successfully', 'success');
-                
-                // Update server status
-                server.agent_status = 'installed';
-                this.renderServers();
-            } else {
-                // Update progress to 100% (failed)
-                if (progressFill) progressFill.style.width = '100%';
-                if (progressPercentage) progressPercentage.textContent = '100%';
-                
-                this.addTerminalLine(`[ERROR] ${result.error}`, 'error');
-                this.showNotification('Agent installation failed', 'error');
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || err.message || `HTTP ${response.status}`);
             }
+            // Не завершаем установку по HTTP-ответу — ждём события Socket.IO
+            this.addTerminalLine(`[INFO] Installation process started on server side...`, 'info');
         } catch (error) {
-            this.addTerminalLine(`[ERROR] Installation failed: ${error.message}`, 'error');
-            this.showNotification('Agent installation failed', 'error');
+            this.addTerminalLine(`[ERROR] Failed to start installation: ${error.message}`, 'error');
+            this.showNotification('Agent installation failed to start', 'error');
+            const closeBtn = document.querySelector('#install-agent-modal .modal-close');
+            if (closeBtn) closeBtn.disabled = false;
         }
-
-        // Enable close button
-        const closeBtn = document.querySelector('#install-agent-modal .modal-close');
-        if (closeBtn) closeBtn.disabled = false;
     }
 
     addTerminalLine(text, type = 'info') {
