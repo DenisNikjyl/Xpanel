@@ -118,8 +118,8 @@ def get_server_stats(server_id):
 
 @app.route('/api/servers/<server_id>/install-agent', methods=['POST'])
 @jwt_required()
-def install_agent(server_id):
-    """Install agent on server"""
+def install_agent_legacy(server_id):
+    """Install agent on server (legacy)"""
     data = request.get_json()
     result = server_manager.install_agent_remote(
         host=data.get('host'),
@@ -212,7 +212,7 @@ def execute_custom_action():
 
 @app.route('/api/install-agent', methods=['POST'])
 @jwt_required()
-def install_agent():
+def install_agent_realtime():
     """Install agent with real-time progress via WebSocket"""
     try:
         data = request.get_json()
@@ -271,45 +271,6 @@ def install_agent():
             'error': f'Ошибка запуска установки агента: {str(e)}'
         }), 500
 
-@app.route('/api/servers/<int:server_id>/install-agent', methods=['POST'])
-@jwt_required()
-def install_agent_on_server(server_id):
-    """Install agent on specific server"""
-    try:
-        data = request.get_json()
-        
-        # Получаем информацию о сервере
-        server_config = {
-            'host': data.get('host'),
-            'port': data.get('port', 22),
-            'username': data.get('username'),
-            'password': data.get('password'),
-            'key_file': data.get('key_file'),
-            'name': data.get('name', f"Server-{server_id}")
-        }
-        
-        # Устанавливаем агент
-        installer = RealAgentInstaller()
-        result = installer.install_agent(server_config)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': result['message'],
-                'server_info': result.get('server_info', {})
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Ошибка установки агента: {str(e)}'
-        }), 500
-
 @app.route('/api/servers/install-agent', methods=['POST'])
 @jwt_required()
 def install_agent_remote():
@@ -318,6 +279,7 @@ def install_agent_remote():
     
     host = data.get('host')
     port = data.get('port', 22)
+{{ ... }}
     username = data.get('username')
     password = data.get('password')
     key_file = data.get('key_file')
