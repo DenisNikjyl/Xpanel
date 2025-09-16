@@ -121,8 +121,8 @@ def get_server_stats(server_id):
 def install_agent_legacy(server_id):
     """Install agent on server using real SSH installer"""
     try:
-        # Получаем информацию о сервере
-        servers = load_servers()
+        # Получаем информацию о сервере через server_manager
+        servers = server_manager.get_servers()
         server = next((s for s in servers if str(s['id']) == str(server_id)), None)
         
         if not server:
@@ -146,15 +146,13 @@ def install_agent_legacy(server_id):
         result = real_installer.install_agent(server_config)
         
         if result['success']:
-            # Обновляем статус сервера
-            server['agent_installed'] = True
-            server['status'] = 'online'
-            save_servers(servers)
+            # Обновляем статус сервера через server_manager
+            server_manager.update_server_status(server_id, 'online', agent_installed=True)
         
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Ошибка установки агента: {e}")
+        print(f"Ошибка установки агента: {e}")
         return jsonify({
             'success': False,
             'error': f'Ошибка установки агента: {str(e)}'

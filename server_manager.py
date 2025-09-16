@@ -758,7 +758,7 @@ class ServerManager:
             'last_update': datetime.now().isoformat()
         }
 
-    def update_server_status(self, server_id, status):
+    def update_server_status(self, server_id, status, agent_installed=None):
         """Update server status"""
         try:
             servers_file = 'servers.json'
@@ -770,9 +770,11 @@ class ServerManager:
             
             # Находим и обновляем сервер
             for server in servers:
-                if server['id'] == server_id:
+                if str(server['id']) == str(server_id):
                     server['status'] = status
                     server['last_seen'] = datetime.now().isoformat()
+                    if agent_installed is not None:
+                        server['agent_installed'] = agent_installed
                     break
             
             # Сохраняем обновленные данные
@@ -780,7 +782,19 @@ class ServerManager:
                 json.dump(servers, f, ensure_ascii=False, indent=2)
                 
         except Exception as e:
-            self.logger.error(f"Error updating server status: {e}")
+            print(f"Error updating server status: {e}")
+
+    def get_servers(self):
+        """Get all servers"""
+        try:
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            print(f"Error loading servers: {e}")
+            return []
 
     def get_server_by_id(self, server_id):
         """Get server by ID"""
