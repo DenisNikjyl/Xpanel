@@ -326,24 +326,24 @@ class UltraDashboard {
             </div>
             
             <div class="server-actions">
-                <button class="btn-connect" onclick="dashboard.connectToServer('${server.id}')">
+                <button class="btn-connect" onclick="connectToServer('${server.id}')">
                     <i class="fas fa-terminal"></i> Connect
                 </button>
-                <button class="btn-manage" onclick="dashboard.manageServer('${server.id}')">
+                <button class="btn-manage" onclick="manageServer('${server.id}')">
                     <i class="fas fa-cog"></i> Manage
                 </button>
-                <button class="btn-install" onclick="dashboard.installAgent('${server.id}')">
+                <button class="btn-install" onclick="installAgent('${server.id}')">
                     <i class="fas fa-download"></i> Install Agent
                 </button>
-                <button class="btn-delete" onclick="dashboard.deleteServer('${server.id}')">
+                <button class="btn-delete" onclick="deleteServer('${server.id}')">
                     <i class="fas fa-trash"></i> Delete
                 </button>
                     <div class="dropdown-menu">
-                        <a href="#" onclick="dashboard.editServer('${server.id}')">
+                        <a href="#" onclick="editServer('${server.id}')">
                             <i class="fas fa-edit"></i>
                             Edit
                         </a>
-                        <a href="#" onclick="dashboard.deleteServer('${server.id}')">
+                        <a href="#" onclick="deleteServer('${server.id}')">
                             <i class="fas fa-trash"></i>
                             Delete
                         </a>
@@ -1277,5 +1277,46 @@ window.closeModal = (modalId) => {
     if (modal) {
         modal.classList.remove('active');
         document.body.style.overflow = '';
+    }
+};
+
+// Global functions for server actions
+window.installAgent = (serverId) => {
+    if (window.dashboard && window.dashboard.installAgent) {
+        window.dashboard.installAgent(serverId);
+    } else {
+        console.error('Dashboard not ready or installAgent method not found');
+    }
+};
+
+window.deleteServer = (serverId) => {
+    if (window.dashboard && window.dashboard.deleteServer) {
+        window.dashboard.deleteServer(serverId);
+    } else {
+        console.error('Dashboard not ready or deleteServer method not found');
+    }
+};
+
+window.manageServer = (serverId) => {
+    if (window.dashboard && window.dashboard.manageServer) {
+        window.dashboard.manageServer(serverId);
+    } else {
+        console.error('Dashboard not ready or manageServer method not found');
+    }
+};
+
+window.connectToServer = (serverId) => {
+    if (window.dashboard && window.dashboard.connectToServer) {
+        window.dashboard.connectToServer(serverId);
+    } else {
+        console.error('Dashboard not ready or connectToServer method not found');
+    }
+};
+
+window.editServer = (serverId) => {
+    if (window.dashboard && window.dashboard.showEditServerModal) {
+        window.dashboard.showEditServerModal(serverId);
+    } else {
+        console.error('Dashboard not ready or showEditServerModal method not found');
     }
 };
