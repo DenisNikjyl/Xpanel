@@ -404,9 +404,6 @@ SERVICE_EOF
                     send_progress("Installation Complete", 100, f"{status_output}\n\nroot@{host}:~# echo 'Installation completed successfully!'\nInstallation completed successfully!\nroot@{host}:~#", status_output)
                 else:
                     send_progress("Installation Complete", 100, f"● xpanel-agent.service - Xpanel Monitoring Agent\n   Loaded: loaded (/etc/systemd/system/xpanel-agent.service; enabled)\n   Active: active (running)\n\nroot@{host}:~# echo 'Installation completed successfully!'\nInstallation completed successfully!\nroot@{host}:~#")
-            else:
-                status_output = status_check.get('output', 'inactive').strip()
-                send_progress("Status Check", 98, f"{status_output}\nroot@{host}:~#", status_output)
                 
                 return {
                     'success': True,
@@ -417,9 +414,11 @@ SERVICE_EOF
                         'os': os_info,
                         'status': 'active'
                     },
-                    'service_status': info_check['output'] if info_check['success'] else None
+                    'service_status': info_check.get('output', '') if 'info_check' in locals() and info_check['success'] else None
                 }
             else:
+                status_output = status_check.get('output', 'inactive').strip()
+                send_progress("Status Check", 98, f"{status_output}\nroot@{host}:~#", status_output)
                 # Получаем детальные логи для диагностики
                 logs_cmd = f"{cmd_prefix}journalctl -u xpanel-agent --no-pager -n 20"
                 send_progress("Диагностика", 99, f"Выполняется: {logs_cmd}")
