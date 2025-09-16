@@ -1399,6 +1399,47 @@ def add_firewall_rule():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    """Get system users"""
+    try:
+        # Get real users from system or database
+        users = []
+        
+        # Get current user info
+        current_user = get_jwt_identity()
+        users.append({
+            'id': 1,
+            'username': current_user,
+            'email': f'{current_user}@xpanel.local',
+            'role': 'admin',
+            'active': True,
+            'lastLogin': datetime.now().isoformat()
+        })
+        
+        # Add any additional users from agent data or system
+        for server_id, agent_data in agent_cache.items():
+            if 'system_users' in agent_data:
+                for idx, user in enumerate(agent_data['system_users'][:5]):  # Limit to 5 users
+                    users.append({
+                        'id': len(users) + 1,
+                        'username': user.get('username', f'user{idx}'),
+                        'email': f"{user.get('username', f'user{idx}')}@{agent_data.get('hostname', 'server')}.local",
+                        'role': 'user' if user.get('username') != 'root' else 'admin',
+                        'active': True,
+                        'lastLogin': user.get('last_login', datetime.now().isoformat())
+                    })
+        
+        return jsonify({
+            'users': users,
+            'total': len(users)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/security/logs', methods=['GET'])
 @jwt_required()
 def get_security_logs():

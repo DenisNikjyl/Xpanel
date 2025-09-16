@@ -284,24 +284,18 @@ class UltraDashboard {
             </div>
             
             <div class="server-actions">
-                <button class="action-btn secondary" onclick="dashboard.connectToServer('${server.id}')">
-                    <i class="fas fa-terminal"></i>
-                    Connect
+                <button class="btn-connect" onclick="dashboard.connectToServer('${server.id}')">
+                    <i class="fas fa-terminal"></i> Connect
                 </button>
-                <button class="action-btn primary" onclick="dashboard.manageServer('${server.id}')">
-                    <i class="fas fa-cog"></i>
-                    Manage
+                <button class="btn-manage" onclick="dashboard.manageServer('${server.id}')">
+                    <i class="fas fa-cog"></i> Manage
                 </button>
-                ${server.agent_status !== 'installed' ? 
-                    `<button class="action-btn success" onclick="dashboard.installAgent('${server.id}')">
-                        <i class="fas fa-download"></i>
-                        Install Agent
-                    </button>` : ''
-                }
-                <div class="dropdown">
-                    <button class="action-btn secondary dropdown-toggle">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
+                <button class="btn-install" onclick="dashboard.installAgent('${server.id}')">
+                    <i class="fas fa-download"></i> Install Agent
+                </button>
+                <button class="btn-delete" onclick="dashboard.deleteServer('${server.id}')">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
                     <div class="dropdown-menu">
                         <a href="#" onclick="dashboard.editServer('${server.id}')">
                             <i class="fas fa-edit"></i>
@@ -918,26 +912,88 @@ class UltraDashboard {
         window.location.href = '/login';
     }
 
-    // Server Actions - Real implementations
-    async connectToServer(serverId) {
+    async installAgent(serverId) {
+        this.showNotification('Starting agent installation...', 'info');
+        
         try {
-            const response = await fetch(`/api/servers/${serverId}/terminal`, {
+            const response = await fetch('/api/install-agent', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.auth.getToken()}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ server_id: serverId })
             });
 
             if (response.ok) {
-                const data = await response.json();
-                this.openTerminalModal(serverId, data.session_id);
+                this.showInstallationProgress(serverId);
             } else {
-                this.showNotification('Failed to connect to server terminal', 'error');
+                this.showNotification('Failed to start installation', 'error');
             }
         } catch (error) {
-            console.error('Failed to connect to server:', error);
-            this.showNotification('Connection failed', 'error');
+            console.error('Installation error:', error);
+            this.showNotification('Installation failed', 'error');
+        }
+    }
+
+    showInstallationProgress(serverId) {
+        // Create installation progress modal
+        const modal = document.createElement('div');
+        modal.className = 'modal installation-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Installing Agent - ${serverId}</h3>
+                    <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="installation-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text">0% - Initializing...</div>
+                    <div class="terminal-output" id="install-terminal-${serverId}"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Listen for WebSocket updates
+        if (this.socket) {
+            this.socket.on('installation_progress', (data) => {
+                if (data.server_id === serverId) {
+                    this.updateInstallationProgress(serverId, data);
+                }
+            });
+        }
+    }
+
+    updateInstallationProgress(serverId, data) {
+        const progressBar = document.querySelector('.progress-fill');
+        const progressText = document.querySelector('.progress-text');
+        const terminal = document.getElementById(`install-terminal-${serverId}`);
+
+        if (progressBar) {
+            progressBar.style.width = `${data.progress}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${data.progress}% - ${data.message}`;
+        }
+
+        if (terminal && data.command_output) {
+            const logLine = document.createElement('div');
+            logLine.className = `log-line ${data.is_error ? 'error' : 'info'}`;
+            logLine.textContent = data.command_output;
+            terminal.appendChild(logLine);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        if (data.progress === 100) {
+            setTimeout(() => {
+                document.querySelector('.installation-modal')?.remove();
+                this.loadServers(); // Refresh server list
+                this.showNotification('Agent installed successfully!', 'success');
+            }, 2000);
         }
     }
 

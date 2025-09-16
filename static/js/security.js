@@ -78,30 +78,26 @@ class SecurityManager {
 
     async loadThreats() {
         try {
-            // Simulate API call with mock data
-            this.threats = [
-                {
-                    id: 1,
-                    type: 'Malware',
-                    severity: 'high',
-                    source: '192.168.1.50',
-                    description: 'Подозрительная активность обнаружена',
-                    timestamp: new Date(Date.now() - 30 * 60 * 1000),
-                    status: 'blocked'
-                },
-                {
-                    id: 2,
-                    type: 'Brute Force',
-                    severity: 'medium',
-                    source: '10.0.0.15',
-                    description: 'Множественные попытки входа',
-                    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-                    status: 'monitoring'
+            const response = await fetch('/api/security/threats', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
-            ];
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.threats = data.threats || [];
+            } else {
+                console.error('Failed to load threats:', response.statusText);
+                this.threats = [];
+            }
+            
             this.renderThreats();
         } catch (error) {
             console.error('Ошибка загрузки угроз:', error);
+            this.threats = [];
+            this.renderThreats();
         }
     }
 
@@ -142,29 +138,26 @@ class SecurityManager {
 
     async loadFirewallRules() {
         try {
-            this.firewallRules = [
-                {
-                    id: 1,
-                    name: 'SSH Access',
-                    action: 'allow',
-                    protocol: 'tcp',
-                    port: '22',
-                    source: '192.168.1.0/24',
-                    enabled: true
-                },
-                {
-                    id: 2,
-                    name: 'Block Suspicious IPs',
-                    action: 'deny',
-                    protocol: 'tcp',
-                    port: 'any',
-                    source: '10.0.0.0/8',
-                    enabled: true
+            const response = await fetch('/api/security/firewall', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
-            ];
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.firewallRules = data.rules || [];
+            } else {
+                console.error('Failed to load firewall rules:', response.statusText);
+                this.firewallRules = [];
+            }
+            
             this.renderFirewallRules();
         } catch (error) {
             console.error('Ошибка загрузки правил фаервола:', error);
+            this.firewallRules = [];
+            this.renderFirewallRules();
         }
     }
 
@@ -196,27 +189,32 @@ class SecurityManager {
 
     async loadLogs() {
         try {
-            this.logs = [
-                {
-                    id: 1,
-                    type: 'auth',
-                    level: 'info',
-                    message: 'Успешный вход пользователя admin',
-                    timestamp: new Date(Date.now() - 10 * 60 * 1000),
-                    source: '192.168.1.100'
-                },
-                {
-                    id: 2,
-                    type: 'firewall',
-                    level: 'warning',
-                    message: 'Заблокировано подключение с подозрительного IP',
-                    timestamp: new Date(Date.now() - 25 * 60 * 1000),
-                    source: '10.0.0.15'
+            const response = await fetch('/api/security/logs', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
-            ];
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.logs = data.logs || [];
+                // Convert timestamp strings to Date objects
+                this.logs.forEach(log => {
+                    if (typeof log.timestamp === 'string') {
+                        log.timestamp = new Date(log.timestamp);
+                    }
+                });
+            } else {
+                console.error('Failed to load logs:', response.statusText);
+                this.logs = [];
+            }
+            
             this.renderLogs();
         } catch (error) {
             console.error('Ошибка загрузки логов:', error);
+            this.logs = [];
+            this.renderLogs();
         }
     }
 
@@ -234,27 +232,32 @@ class SecurityManager {
 
     async loadUsers() {
         try {
-            this.users = [
-                {
-                    id: 1,
-                    username: 'admin',
-                    email: 'admin@xpanel.com',
-                    role: 'admin',
-                    active: true,
-                    lastLogin: new Date(Date.now() - 30 * 60 * 1000)
-                },
-                {
-                    id: 2,
-                    username: 'user1',
-                    email: 'user1@example.com',
-                    role: 'user',
-                    active: true,
-                    lastLogin: new Date(Date.now() - 2 * 60 * 60 * 1000)
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
-            ];
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.users = data.users || [];
+                // Convert lastLogin strings to Date objects
+                this.users.forEach(user => {
+                    if (typeof user.lastLogin === 'string') {
+                        user.lastLogin = new Date(user.lastLogin);
+                    }
+                });
+            } else {
+                console.error('Failed to load users:', response.statusText);
+                this.users = [];
+            }
+            
             this.renderUsers();
         } catch (error) {
             console.error('Ошибка загрузки пользователей:', error);
+            this.users = [];
+            this.renderUsers();
         }
     }
 

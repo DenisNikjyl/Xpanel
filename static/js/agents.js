@@ -106,13 +106,13 @@ class AgentsManager {
                 this.filterAgents();
             } else {
                 this.showNotification('Ошибка загрузки агентов', 'error');
-                this.agents = this.generateMockAgents(); // Временные данные
+                this.agents = [];
                 this.updateStats();
                 this.filterAgents();
             }
         } catch (error) {
             console.error('Ошибка загрузки агентов:', error);
-            this.agents = this.generateMockAgents(); // Временные данные
+            this.agents = [];
             this.updateStats();
             this.filterAgents();
         }
@@ -135,55 +135,7 @@ class AgentsManager {
         }
     }
 
-    generateMockAgents() {
-        return [
-            {
-                id: 'agent_001',
-                server_name: 'Web Server 01',
-                host: '192.168.1.100',
-                status: 'online',
-                version: 'v2.1.0',
-                last_seen: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-                uptime: 86400,
-                cpu_usage: 45.2,
-                memory_usage: 67.8,
-                disk_usage: 34.1,
-                network_in: 1024,
-                network_out: 2048,
-                installed_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-                id: 'agent_002',
-                server_name: 'Database Server',
-                host: '192.168.1.101',
-                status: 'online',
-                version: 'v2.0.5',
-                last_seen: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-                uptime: 172800,
-                cpu_usage: 78.5,
-                memory_usage: 89.2,
-                disk_usage: 56.7,
-                network_in: 2048,
-                network_out: 1536,
-                installed_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-                id: 'agent_003',
-                server_name: 'API Server',
-                host: '192.168.1.102',
-                status: 'offline',
-                version: 'v2.1.0',
-                last_seen: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-                uptime: 0,
-                cpu_usage: 0,
-                memory_usage: 0,
-                disk_usage: 45.3,
-                network_in: 0,
-                network_out: 0,
-                installed_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-            }
-        ];
-    }
+    // Removed mock data - using only real API data
 
     updateStats() {
         const online = this.agents.filter(agent => agent.status === 'online').length;
