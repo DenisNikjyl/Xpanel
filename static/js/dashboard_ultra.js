@@ -324,32 +324,6 @@ class UltraDashboard {
                     </div>
                 </div>
             </div>
-            
-            <div class="server-actions">
-                <button class="btn-connect" onclick="connectToServer('${server.id}')">
-                    <i class="fas fa-terminal"></i> Connect
-                </button>
-                <button class="btn-manage" onclick="manageServer('${server.id}')">
-                    <i class="fas fa-cog"></i> Manage
-                </button>
-                <button class="btn-install" onclick="installAgent('${server.id}')">
-                    <i class="fas fa-download"></i> Install Agent
-                </button>
-                <button class="btn-delete" onclick="deleteServer('${server.id}')">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-                    <div class="dropdown-menu">
-                        <a href="#" onclick="editServer('${server.id}')">
-                            <i class="fas fa-edit"></i>
-                            Edit
-                        </a>
-                        <a href="#" onclick="deleteServer('${server.id}')">
-                            <i class="fas fa-trash"></i>
-                            Delete
-                        </a>
-                    </div>
-                </div>
-            </div>
         `;
 
         return card;

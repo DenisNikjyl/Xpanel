@@ -142,12 +142,32 @@ def install_agent_legacy(server_id):
             'name': server['name']
         }
         
-        # Запускаем установку
-        result = real_installer.install_agent(server_config)
+        # Прогресс коллбек для отправки real-time логов через Socket.IO
+        def progress_callback(progress_data):
+            try:
+                progress_payload = dict(progress_data)
+                progress_payload['server_id'] = str(server_id)
+                socketio.emit('installation_progress', progress_payload)
+            except Exception as e:
+                print(f"Emit progress error: {e}")
+        
+        # Запускаем установку (коллбек будет транслировать прогресс по WebSocket)
+        result = real_installer.install_agent(server_config, progress_callback)
         
         if result['success']:
             # Обновляем статус сервера через server_manager
             server_manager.update_server_status(server_id, 'online', agent_installed=True)
+        
+        # Отправляем событие завершения установки
+        try:
+            socketio.emit('installation_complete', {
+                'server_id': str(server_id),
+                'success': result.get('success', False),
+                'message': result.get('message'),
+                'error': result.get('error')
+            })
+        except Exception as e:
+            print(f"Emit completion error: {e}")
         
         return jsonify(result)
         

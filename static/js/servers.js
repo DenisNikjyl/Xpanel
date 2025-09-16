@@ -5,6 +5,9 @@ class ServersManager {
         this.auth = new XpanelAuth();
         this.servers = [];
         this.searchTerm = '';
+        // Socket.IO for real-time installation logs
+        this.socket = null;
+        this.installingServerId = null;
         this.init();
     }
 
@@ -159,7 +162,7 @@ class ServersManager {
                     <i class="fas fa-cog"></i>
                     Manage
                 </button>
-                ${server.agent_status !== 'installed' ? 
+                ${!server.agent_installed ? 
                     `<button class="action-btn success" onclick="serversManager.installAgent('${server.id}')">
                         <i class="fas fa-download"></i>
                         Install Agent
@@ -335,7 +338,11 @@ class ServersManager {
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
 
-        // Start installation
+        // Prepare real-time socket listeners
+        this.installingServerId = server.id;
+        this.ensureSocketConnected();
+
+        // Start installation (backend will emit progress over WebSocket)
         this.performAgentInstallation(server);
     }
 
@@ -410,6 +417,62 @@ class ServersManager {
         terminal.scrollTop = terminal.scrollHeight;
     }
 
+    // Socket.IO real-time installation handlers
+    ensureSocketConnected() {
+        try {
+            if (!this.socket && typeof io !== 'undefined') {
+                this.socket = io();
+                // Progress updates
+                this.socket.on('installation_progress', (data) => {
+                    if (!this.installingServerId || data.server_id !== this.installingServerId) return;
+                    const progressFill = document.getElementById('install-progress-fill');
+                    const progressPercentage = document.getElementById('install-progress-percentage');
+                    if (progressFill && typeof data.progress === 'number') {
+                        progressFill.style.width = `${Math.min(100, Math.max(0, data.progress))}%`;
+                    }
+                    if (progressPercentage && typeof data.progress === 'number') {
+                        progressPercentage.textContent = `${Math.round(data.progress)}%`;
+                    }
+                    // Main message
+                    if (data.step || data.message) {
+                        const line = [data.step, data.message].filter(Boolean).join(' - ');
+                        this.addTerminalLine(line, data.is_error ? 'error' : 'info');
+                    }
+                    // Command output (multi-line)
+                    if (data.command_output && data.command_output.trim()) {
+                        data.command_output.split('\n').forEach(l => {
+                            if (l.trim()) this.addTerminalLine(l, 'info');
+                        });
+                    }
+                });
+                // Completion
+                this.socket.on('installation_complete', (data) => {
+                    if (!this.installingServerId || data.server_id !== this.installingServerId) return;
+                    const progressFill = document.getElementById('install-progress-fill');
+                    const progressPercentage = document.getElementById('install-progress-percentage');
+                    if (progressFill) progressFill.style.width = '100%';
+                    if (progressPercentage) progressPercentage.textContent = '100%';
+                    if (data.success) {
+                        this.addTerminalLine('[SUCCESS] Agent installed successfully!', 'success');
+                        this.showNotification('Agent installed successfully', 'success');
+                    } else {
+                        this.addTerminalLine(`[ERROR] ${data.error || 'Installation failed'}`, 'error');
+                        this.showNotification('Agent installation failed', 'error');
+                    }
+                    // Enable close button
+                    const closeBtn = document.querySelector('#install-agent-modal .modal-close');
+                    if (closeBtn) closeBtn.disabled = false;
+                    // Refresh servers list
+                    this.loadServers();
+                    // Reset current installation
+                    this.installingServerId = null;
+                });
+            }
+        } catch (err) {
+            console.error('Socket initialization error:', err);
+        }
+    }
+
     // Utility Functions
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -433,6 +496,98 @@ class ServersManager {
     handleSearch(e) {
         this.searchTerm = e.target.value;
         this.renderServers();
+    }
+
+    async manageServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/services`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            if (!response.ok) throw new Error('Failed to load services');
+            const services = await response.json();
+            this.openServerManagementModal(serverId, services);
+        } catch (error) {
+            console.error('Failed to load server services:', error);
+            this.showNotification('Failed to load server services', 'error');
+        }
+    }
+
+    openServerManagementModal(serverId, services) {
+        // Build modal
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-backdrop"></div>
+            <div class="modal-container">
+                <div class="modal-header">
+                    <div class="modal-title"><i class="fas fa-cog"></i> Manage Server</div>
+                    <button class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="services-list">
+                        ${Array.isArray(services) && services.length ? services.map(s => `
+                            <div class="service-item">
+                                <div class="service-info">
+                                    <div class="service-name">${s.name}</div>
+                                    <div class="service-status ${s.status}">${s.status}</div>
+                                </div>
+                                <div class="service-actions">
+                                    <button class="action-btn" data-action="start" data-name="${s.name}">Start</button>
+                                    <button class="action-btn" data-action="stop" data-name="${s.name}">Stop</button>
+                                    <button class="action-btn" data-action="restart" data-name="${s.name}">Restart</button>
+                                </div>
+                            </div>
+                        `).join('') : '<div class="empty-state">No services data</div>'}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary modal-close">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+
+        // Handlers
+        modal.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', () => {
+            modal.remove();
+            document.body.style.overflow = '';
+        }));
+        modal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            modal.remove();
+            document.body.style.overflow = '';
+        });
+        modal.querySelectorAll('.action-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const action = e.currentTarget.getAttribute('data-action');
+                const name = e.currentTarget.getAttribute('data-name');
+                await this.controlService(serverId, name, action);
+                // Refresh list
+                modal.remove();
+                this.manageServer(serverId);
+            });
+        });
+    }
+
+    async controlService(serverId, serviceName, action) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/services/${serviceName}/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            if (response.ok) {
+                this.showNotification(`Service ${serviceName} ${action} successful`, 'success');
+            } else {
+                this.showNotification(`Failed to ${action} ${serviceName}`, 'error');
+            }
+        } catch (error) {
+            console.error('Service control error:', error);
+            this.showNotification('Service control failed', 'error');
+        }
     }
 
     toggleAuthFields() {
@@ -552,9 +707,20 @@ class ServersManager {
         window.location.href = `/terminal?server=${serverId}`;
     }
 
-    manageServer(serverId) {
-        console.log('Managing server:', serverId);
-        this.showNotification('Server management panel coming soon', 'info');
+    async manageServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/services`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+            if (!response.ok) throw new Error('Failed to load services');
+            const services = await response.json();
+            this.openServerManagementModal(serverId, services);
+        } catch (error) {
+            console.error('Failed to load server management:', error);
+            this.showNotification('Failed to load server management', 'error');
+        }
     }
 
     editServer(serverId) {
@@ -590,3 +756,12 @@ class ServersManager {
 document.addEventListener('DOMContentLoaded', () => {
     window.serversManager = new ServersManager();
 });
+
+// Global closeModal for inline onclick handlers in templates
+window.closeModal = (modalId) => {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+};
