@@ -1330,38 +1330,7 @@ def remove_agent_endpoint(agent_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# Security API endpoints
-@app.route('/api/security/threats', methods=['GET'])
-@jwt_required()
-def get_security_threats():
-    """Get security threats"""
-    try:
-        # Mock data for now - in production, integrate with real security monitoring
-        threats = [
-            {
-                'id': 1,
-                'type': 'Brute Force Attack',
-                'severity': 'high',
-                'source': '192.168.1.100',
-                'target': 'SSH (Port 22)',
-                'timestamp': '2024-09-15 14:30:00',
-                'status': 'blocked',
-                'attempts': 25
-            },
-            {
-                'id': 2,
-                'type': 'Port Scan',
-                'severity': 'medium',
-                'source': '10.0.0.50',
-                'target': 'Multiple Ports',
-                'timestamp': '2024-09-15 13:15:00',
-                'status': 'monitoring',
-                'attempts': 1
-            }
-        ]
-        return jsonify(threats)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Duplicate function removed - using the real implementation above
 
 @app.route('/api/security/firewall', methods=['GET'])
 @jwt_required()
