@@ -135,9 +135,10 @@ class RealAgentInstaller:
                     }
             
             # Шаг 3: Проверка системных требований
-            send_progress("Проверка системы", 20, "Проверка операционной системы и зависимостей")
+            system_cmd = "uname -a && which python3 && which systemctl && python3 --version"
+            send_progress("Проверка системы", 20, f"Выполняется: {system_cmd}")
             
-            system_check = conn.execute_command("uname -a && which python3 && which systemctl && python3 --version")
+            system_check = conn.execute_command(system_cmd)
             if not system_check['success']:
                 send_progress("Проверка системы", 20, "Ошибка проверки системы", system_check.get('error', ''), True)
                 return {
@@ -149,9 +150,10 @@ class RealAgentInstaller:
             send_progress("Проверка системы", 25, f"Система: {os_info}", system_check['output'])
             
             # Шаг 4: Создание директории агента
-            send_progress("Создание директорий", 30, "Создание /opt/xpanel-agent")
+            mkdir_cmd = f"{cmd_prefix}mkdir -p /opt/xpanel-agent && {cmd_prefix}chmod 755 /opt/xpanel-agent"
+            send_progress("Создание директорий", 30, f"Выполняется: {mkdir_cmd}")
             
-            create_dir = conn.execute_command(f"{cmd_prefix}mkdir -p /opt/xpanel-agent && {cmd_prefix}chmod 755 /opt/xpanel-agent && ls -la /opt/")
+            create_dir = conn.execute_command(mkdir_cmd)
             if not create_dir['success']:
                 send_progress("Создание директорий", 30, "Ошибка создания директории", create_dir.get('error', ''), True)
                 return {
@@ -159,39 +161,39 @@ class RealAgentInstaller:
                     'error': f"Ошибка создания директории: {create_dir['error']}"
                 }
             
-            send_progress("Создание директорий", 35, "Директория создана", create_dir['output'])
+            ls_cmd = f"ls -la /opt/"
+            send_progress("Создание директорий", 32, f"Выполняется: {ls_cmd}")
+            ls_result = conn.execute_command(ls_cmd)
+            send_progress("Создание директорий", 35, "Директория создана", ls_result.get('output', ''))
             
             # Шаг 4: Установка зависимостей
             send_progress("Установка зависимостей", 40, "Установка Python пакетов")
             
             # Определяем пакетный менеджер
-            pkg_manager_check = conn.execute_command("which apt-get || which yum || which dnf")
+            pkg_check_cmd = "which apt-get || which yum || which dnf"
+            send_progress("Установка зависимостей", 41, f"Выполняется: {pkg_check_cmd}")
+            pkg_manager_check = conn.execute_command(pkg_check_cmd)
             if pkg_manager_check['success']:
                 pkg_manager = pkg_manager_check['output'].strip().split('/')[-1]
                 
                 send_progress("Установка зависимостей", 42, f"Найден пакетный менеджер: {pkg_manager}", pkg_manager_check['output'])
                 
                 if pkg_manager == 'apt-get':
-                    send_progress("Установка зависимостей", 43, "Обновление списка пакетов...")
-                    update_result = conn.execute_command(f"{cmd_prefix}apt-get update -qq", timeout=120)
-                    send_progress("Установка зависимостей", 45, "Установка системных пакетов", update_result.get('output', ''))
+                    send_progress("Установка зависимостей", 43, f"Выполняется: {cmd_prefix}apt-get update")
+                    update_result = conn.execute_command(f"{cmd_prefix}apt-get update", timeout=120)
+                    send_progress("Установка зависимостей", 44, "apt-get update завершен", update_result.get('output', ''))
                     
-                    install_deps = conn.execute_command(
-                        f"{cmd_prefix}apt-get install -y python3-pip python3-requests python3-psutil",
-                        timeout=300
-                    )
+                    deps_cmd = f"{cmd_prefix}apt-get install -y python3-pip python3-requests python3-psutil"
+                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                    install_deps = conn.execute_command(deps_cmd, timeout=300)
                 elif pkg_manager in ['yum', 'dnf']:
-                    send_progress("Установка зависимостей", 45, f"Установка пакетов через {pkg_manager}")
-                    install_deps = conn.execute_command(
-                        f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil",
-                        timeout=300
-                    )
+                    deps_cmd = f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil"
+                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                    install_deps = conn.execute_command(deps_cmd, timeout=300)
                 elif pkg_manager == 'pacman':
-                    send_progress("Установка зависимостей", 45, "Установка пакетов через pacman")
-                    install_deps = conn.execute_command(
-                        f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil",
-                        timeout=300
-                    )
+                    deps_cmd = f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil"
+                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                    install_deps = conn.execute_command(deps_cmd, timeout=300)
                 else:
                     send_progress("Установка зависимостей", 40, "Неподдерживаемый пакетный менеджер", pkg_manager_check['output'], True)
                     return {
@@ -205,11 +207,14 @@ class RealAgentInstaller:
                     send_progress("Установка зависимостей", 47, "Ошибка установки системных пакетов", install_deps.get('error', ''), True)
                 
                 # Устанавливаем Python пакеты через pip
-                send_progress("Установка зависимостей", 48, "Установка Python пакетов через pip")
-                pip_install = conn.execute_command(
-                    f"{cmd_prefix}python3 -m pip install --upgrade pip && {cmd_prefix}python3 -m pip install requests psutil websocket-client",
-                    timeout=180
-                )
+                pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
+                send_progress("Установка зависимостей", 48, f"Выполняется: {pip_cmd}")
+                pip_upgrade = conn.execute_command(pip_cmd, timeout=60)
+                send_progress("Установка зависимостей", 49, "pip обновлен", pip_upgrade.get('output', ''))
+                
+                pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                send_progress("Установка зависимостей", 50, f"Выполняется: {pip_install_cmd}")
+                pip_install = conn.execute_command(pip_install_cmd, timeout=180)
                 
                 if pip_install['success']:
                     send_progress("Установка зависимостей", 50, "Python пакеты установлены", pip_install['output'])
@@ -227,9 +232,10 @@ class RealAgentInstaller:
             temp_script = f"/tmp/xpanel_agent_{int(time.time())}.py"
             
             # Записываем агент через echo (избегаем проблем с SFTP)
-            send_progress("Создание агента", 62, "Запись файла агента на сервер")
+            cat_cmd = f"cat > {temp_script} << 'AGENT_EOF'"
+            send_progress("Создание агента", 62, f"Выполняется: {cat_cmd}")
             write_agent = conn.execute_command(f"""
-cat > {temp_script} << 'AGENT_EOF'
+{cat_cmd}
 {agent_script}
 AGENT_EOF
 """, timeout=30)
@@ -244,8 +250,9 @@ AGENT_EOF
             send_progress("Создание агента", 65, "Файл агента записан", write_agent.get('output', ''))
             
             # Перемещаем агент в целевую директорию
-            send_progress("Создание агента", 67, "Установка агента в /opt/xpanel-agent/")
-            move_agent = conn.execute_command(f"{cmd_prefix}mv {temp_script} /opt/xpanel-agent/agent.py && {cmd_prefix}chmod +x /opt/xpanel-agent/agent.py && ls -la /opt/xpanel-agent/")
+            move_cmd = f"{cmd_prefix}mv {temp_script} /opt/xpanel-agent/agent.py"
+            send_progress("Создание агента", 67, f"Выполняется: {move_cmd}")
+            move_agent = conn.execute_command(move_cmd)
             if not move_agent['success']:
                 send_progress("Создание агента", 67, "Ошибка установки агента", move_agent.get('error', ''), True)
                 return {
@@ -253,7 +260,14 @@ AGENT_EOF
                     'error': f"Ошибка установки агента: {move_agent['error']}"
                 }
             
-            send_progress("Создание агента", 70, "Агент создан и установлен", move_agent['output'])
+            chmod_cmd = f"{cmd_prefix}chmod +x /opt/xpanel-agent/agent.py"
+            send_progress("Создание агента", 68, f"Выполняется: {chmod_cmd}")
+            chmod_result = conn.execute_command(chmod_cmd)
+            
+            ls_cmd = f"ls -la /opt/xpanel-agent/"
+            send_progress("Создание агента", 69, f"Выполняется: {ls_cmd}")
+            ls_result = conn.execute_command(ls_cmd)
+            send_progress("Создание агента", 70, "Агент создан и установлен", ls_result.get('output', ''))
             
             # Шаг 6: Создание systemd сервиса
             send_progress("Настройка сервиса", 75, "Создание systemd сервиса")
@@ -263,8 +277,12 @@ AGENT_EOF
             
             # Создаем сервис
             service_file = "/tmp/xpanel-agent.service"
-            conn.execute_command(f"{cmd_prefix}rm -f {service_file}")
+            rm_cmd = f"{cmd_prefix}rm -f {service_file}"
+            send_progress("Настройка сервиса", 76, f"Выполняется: {rm_cmd}")
+            conn.execute_command(rm_cmd)
             
+            tee_cmd = f'echo "[Unit]" | {cmd_prefix}tee {service_file}'
+            send_progress("Настройка сервиса", 76.5, f"Выполняется: {tee_cmd}")
             for i, line in enumerate(service_lines):
                 escaped_line = line.replace('"', '\\"')
                 if i == 0:
@@ -273,8 +291,13 @@ AGENT_EOF
                     conn.execute_command(f'echo "{escaped_line}" | {cmd_prefix}tee -a {service_file} > /dev/null')
             
             # Устанавливаем сервис
-            send_progress("Настройка сервиса", 77, "Установка systemd сервиса")
-            install_service = conn.execute_command(f"{cmd_prefix}mv {service_file} /etc/systemd/system/xpanel-agent.service && ls -la /etc/systemd/system/xpanel-agent.service")
+            install_cmd = f"{cmd_prefix}mv {service_file} /etc/systemd/system/xpanel-agent.service"
+            send_progress("Настройка сервиса", 77, f"Выполняется: {install_cmd}")
+            install_service = conn.execute_command(install_cmd)
+            
+            ls_service_cmd = f"ls -la /etc/systemd/system/xpanel-agent.service"
+            send_progress("Настройка сервиса", 77.5, f"Выполняется: {ls_service_cmd}")
+            ls_service = conn.execute_command(ls_service_cmd)
             if not install_service['success']:
                 send_progress("Настройка сервиса", 77, "Ошибка установки сервиса", install_service.get('error', ''), True)
                 return {
@@ -285,8 +308,9 @@ AGENT_EOF
             send_progress("Настройка сервиса", 78, "Сервис установлен", install_service['output'])
             
             # Перезагружаем systemd
-            send_progress("Настройка сервиса", 79, "Перезагрузка systemd daemon")
-            reload_result = conn.execute_command(f"{cmd_prefix}systemctl daemon-reload")
+            reload_cmd = f"{cmd_prefix}systemctl daemon-reload"
+            send_progress("Настройка сервиса", 79, f"Выполняется: {reload_cmd}")
+            reload_result = conn.execute_command(reload_cmd)
             
             send_progress("Настройка сервиса", 80, "Сервис создан", reload_result.get('output', ''))
             
@@ -294,15 +318,18 @@ AGENT_EOF
             send_progress("Запуск агента", 85, "Включение и запуск сервиса")
             
             # Включаем автозапуск
-            enable_service = conn.execute_command(f"{cmd_prefix}systemctl enable xpanel-agent")
+            enable_cmd = f"{cmd_prefix}systemctl enable xpanel-agent"
+            send_progress("Запуск агента", 85, f"Выполняется: {enable_cmd}")
+            enable_service = conn.execute_command(enable_cmd)
             if not enable_service['success']:
                 send_progress("Запуск агента", 85, "Предупреждение: не удалось включить автозапуск", enable_service.get('error', ''), True)
             else:
                 send_progress("Запуск агента", 87, "Автозапуск включен", enable_service['output'])
             
             # Запускаем сервис
-            send_progress("Запуск агента", 88, "Запуск сервиса xpanel-agent")
-            start_service = conn.execute_command(f"{cmd_prefix}systemctl start xpanel-agent")
+            start_cmd = f"{cmd_prefix}systemctl start xpanel-agent"
+            send_progress("Запуск агента", 88, f"Выполняется: {start_cmd}")
+            start_service = conn.execute_command(start_cmd)
             if not start_service['success']:
                 send_progress("Запуск агента", 88, "Ошибка запуска агента", start_service.get('error', ''), True)
                 return {
@@ -318,10 +345,16 @@ AGENT_EOF
             # Ждем немного для запуска
             time.sleep(3)
             
-            status_check = conn.execute_command(f"{cmd_prefix}systemctl is-active xpanel-agent")
+            status_cmd = f"{cmd_prefix}systemctl is-active xpanel-agent"
+            send_progress("Проверка установки", 95, f"Выполняется: {status_cmd}")
+            status_check = conn.execute_command(status_cmd)
+            send_progress("Проверка установки", 98, f"Статус сервиса: {status_check.get('output', 'неизвестно')}")
+            
             if status_check['success'] and 'active' in status_check['output']:
                 # Получаем дополнительную информацию
-                info_check = conn.execute_command(f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l && {cmd_prefix}journalctl -u xpanel-agent --no-pager -n 5")
+                info_cmd = f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l"
+                send_progress("Проверка установки", 99, f"Выполняется: {info_cmd}")
+                info_check = conn.execute_command(info_cmd)
                 send_progress("Проверка установки", 100, "Агент успешно установлен и запущен", info_check.get('output', ''))
                 
                 return {
@@ -336,13 +369,27 @@ AGENT_EOF
                     'service_status': info_check['output'] if info_check['success'] else None
                 }
             else:
-                # Получаем логи для диагностики
-                logs = conn.execute_command(f"{cmd_prefix}journalctl -u xpanel-agent --no-pager -n 20")
+                # Получаем детальные логи для диагностики
+                logs_cmd = f"{cmd_prefix}journalctl -u xpanel-agent --no-pager -n 20"
+                send_progress("Диагностика", 99, f"Выполняется: {logs_cmd}")
+                logs = conn.execute_command(logs_cmd)
+                
+                status_info_cmd = f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l"
+                send_progress("Диагностика", 99.5, f"Выполняется: {status_info_cmd}")
+                status_info = conn.execute_command(status_info_cmd)
+                
+                error_msg = f"Статус: {status_check.get('output', 'неизвестно')}"
+                if not status_check['success']:
+                    error_msg += f" | Ошибка проверки: {status_check.get('error', 'неизвестно')}"
+                
+                send_progress("Проверка установки", 100, f"Агент установлен, но не активен: {error_msg}", 
+                             logs.get('output', '') if logs['success'] else '', True)
                 
                 return {
                     'success': False,
-                    'error': 'Агент установлен, но не запущен',
-                    'logs': logs['output'] if logs['success'] else None
+                    'error': f'Агент установлен, но не запущен: {error_msg}',
+                    'logs': logs['output'] if logs['success'] else None,
+                    'status_info': status_info['output'] if status_info['success'] else None
                 }
                 
         except Exception as e:
