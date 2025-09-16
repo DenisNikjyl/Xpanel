@@ -153,6 +153,7 @@ class RealAgentInstaller:
             # Показываем реальный вывод команды как в терминале
             terminal_output = system_check['output'].strip()
             send_progress("System Check", 25, f"{terminal_output}\nroot@{host}:~#", terminal_output)
+            os_info = terminal_output
             
             # Шаг 4: Создание директории агента
             mkdir_cmd = f"{cmd_prefix}mkdir -p /opt/xpanel-agent && {cmd_prefix}chmod 755 /opt/xpanel-agent"
@@ -172,6 +173,34 @@ class RealAgentInstaller:
             ls_output = ls_result.get('output', '').strip()
             send_progress("Directory Setup", 35, f"{ls_output}\nroot@{host}:~#", ls_output)
             
+            # Вспомогательная функция для потокового выполнения длинных команд
+            def stream_and_progress(cmd: str, step: str, start_progress: int, end_progress: int, timeout: int = 900):
+                # Печатаем команду как в терминале
+                send_progress(step, start_progress, f"root@{host}:~# {cmd}")
+                current = start_progress
+                target = end_progress
+                increment = max(0.2, (end_progress - start_progress) / 200.0)
+
+                def on_line(line: str):
+                    nonlocal current
+                    # Сдвигаем прогресс понемногу, не превышая целевого
+                    if current < target:
+                        current = min(target, current + increment)
+                    send_progress(step, int(current), line, command_output=line)
+
+                result = conn.execute_command_stream(cmd, timeout=timeout, on_output=on_line)
+                # Доводим прогресс до конца шага и показываем итог
+                if int(current) < end_progress:
+                    current = end_progress
+                if result.get('success'):
+                    final_output = result.get('output', '').strip()
+                    if final_output:
+                        send_progress(step, end_progress, f"{final_output}\nroot@{host}:~#", final_output)
+                else:
+                    err = result.get('error', 'unknown error')
+                    send_progress(step, end_progress, f"{err}\nroot@{host}:~#", err, True)
+                return result
+
             # Шаг 4: Установка зависимостей
             send_progress("Установка зависимостей", 40, "Установка Python пакетов")
             
@@ -185,25 +214,12 @@ class RealAgentInstaller:
                 send_progress("Установка зависимостей", 42, f"Найден пакетный менеджер: {pkg_manager}", pkg_manager_check['output'])
                 
                 if pkg_manager == 'apt-get':
+                    # apt update (со стримингом вывода)
                     update_cmd = f"{cmd_prefix}apt update"
-                    send_progress("Package Update", 43, f"root@{host}:~# {update_cmd}")
-                    update_result = conn.execute_command(update_cmd, timeout=120)
-                    
-                    if update_result['success']:
-                        update_output = update_result.get('output', '').strip()
-                        send_progress("Package Update", 44, f"{update_output}\nroot@{host}:~#", update_output)
-                    else:
-                        send_progress("Package Update", 44, f"E: Could not get lock /var/lib/apt/lists/lock\nroot@{host}:~#", update_result.get('error', ''), True)
-                    
+                    update_result = stream_and_progress(update_cmd, "Package Update", 43, 45, timeout=1800)
+                    # apt install (со стримингом вывода)
                     deps_cmd = f"{cmd_prefix}apt install -y python3-pip python3-requests python3-psutil"
-                    send_progress("Package Install", 45, f"root@{host}:~# {deps_cmd}")
-                    install_deps = conn.execute_command(deps_cmd, timeout=300)
-                    
-                    if install_deps['success']:
-                        deps_output = install_deps.get('output', '').strip()
-                        send_progress("Package Install", 50, f"{deps_output}\nroot@{host}:~#", deps_output)
-                    else:
-                        send_progress("Package Install", 50, f"E: Unable to locate package python3-pip\nroot@{host}:~#", install_deps.get('error', ''), True)
+                    install_deps = stream_and_progress(deps_cmd, "Package Install", 45, 55, timeout=3600)
                 elif pkg_manager in ['yum', 'dnf']:
                     deps_cmd = f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil"
                     send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
@@ -225,30 +241,12 @@ class RealAgentInstaller:
                     send_progress("Установка зависимостей", 47, "Ошибка установки системных пакетов", install_deps.get('error', ''), True)
                 
                 # Устанавливаем Python пакеты через pip
+                # pip upgrade (стриминг)
                 pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
-                send_progress("PIP Upgrade", 55, f"root@{host}:~# {pip_cmd}")
-                pip_upgrade = conn.execute_command(pip_cmd, timeout=60)
-                
-                if pip_upgrade['success']:
-                    pip_output = pip_upgrade.get('output', '').strip()
-                    send_progress("PIP Upgrade", 58, f"{pip_output}\nroot@{host}:~#", pip_output)
-                else:
-                    send_progress("PIP Upgrade", 58, f"pip: command not found\nroot@{host}:~#", pip_upgrade.get('error', ''), True)
-                
+                stream_and_progress(pip_cmd, "PIP Upgrade", 55, 60, timeout=1200)
+                # pip install (стриминг)
                 pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
-                send_progress("PIP Install", 60, f"root@{host}:~# {pip_install_cmd}")
-                pip_install = conn.execute_command(pip_install_cmd, timeout=180)
-                
-                if pip_install['success']:
-                    install_output = pip_install.get('output', '').strip()
-                    send_progress("PIP Install", 65, f"{install_output}\nroot@{host}:~#", install_output)
-                else:
-                    send_progress("PIP Install", 65, f"ERROR: Could not find a version that satisfies the requirement\nroot@{host}:~#", pip_install.get('error', ''), True)
-                
-                if pip_install['success']:
-                    send_progress("Установка зависимостей", 50, "Python пакеты установлены", pip_install['output'])
-                else:
-                    send_progress("Установка зависимостей", 50, "Предупреждение: ошибка установки Python пакетов", pip_install.get('error', ''), True)
+                stream_and_progress(pip_install_cmd, "PIP Install", 60, 65, timeout=2400)
             else:
                 send_progress("Установка зависимостей", 50, "Пакетный менеджер не найден, пропускаем установку зависимостей", "", True)
             
@@ -321,14 +319,7 @@ SERVICE_EOF
             else:
                 send_progress("Service Setup", 84, f"bash: {service_file}: Permission denied\nroot@{host}:~#", service_create.get('error', ''), True)
             
-            tee_cmd = f'echo "[Unit]" | {cmd_prefix}tee {service_file}'
-            send_progress("Настройка сервиса", 76.5, f"Выполняется: {tee_cmd}")
-            for i, line in enumerate(service_lines):
-                escaped_line = line.replace('"', '\\"')
-                if i == 0:
-                    conn.execute_command(f'echo "{escaped_line}" | {cmd_prefix}tee {service_file} > /dev/null')
-                else:
-                    conn.execute_command(f'echo "{escaped_line}" | {cmd_prefix}tee -a {service_file} > /dev/null')
+            # Сервисный файл уже создан через heredoc выше; дополнительная запись не требуется
             
             # Устанавливаем сервис
             install_cmd = f"{cmd_prefix}mv {service_file} /etc/systemd/system/xpanel-agent.service"
@@ -422,11 +413,11 @@ SERVICE_EOF
                 # Получаем детальные логи для диагностики
                 logs_cmd = f"{cmd_prefix}journalctl -u xpanel-agent --no-pager -n 20"
                 send_progress("Диагностика", 99, f"Выполняется: {logs_cmd}")
-                logs = conn.execute_command(logs_cmd)
+                logs = conn.execute_command_stream(logs_cmd, timeout=120, on_output=lambda line: send_progress("Диагностика", 99, line, command_output=line))
                 
                 status_info_cmd = f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l"
                 send_progress("Диагностика", 99.5, f"Выполняется: {status_info_cmd}")
-                status_info = conn.execute_command(status_info_cmd)
+                status_info = conn.execute_command_stream(status_info_cmd, timeout=120, on_output=lambda line: send_progress("Диагностика", 99.7, line, command_output=line))
                 
                 error_msg = f"Статус: {status_check.get('output', 'неизвестно')}"
                 if not status_check['success']:
@@ -779,7 +770,7 @@ Wants=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/xpanel-agent
-ExecStart=/usr/bin/python3 /opt/xpanel-agent/xpanel_agent.py
+ExecStart=/usr/bin/python3 /opt/xpanel-agent/agent.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

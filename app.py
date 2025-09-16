@@ -175,7 +175,8 @@ def install_agent_legacy(server_id):
                     'error': f'Ошибка установки агента: {str(e)}'
                 })
 
-        threading.Thread(target=install_in_background, daemon=True).start()
+        # Используем нативный фоновой таск Socket.IO для корректной доставки событий
+        socketio.start_background_task(install_in_background)
 
         # Немедленный ответ
         return jsonify({'success': True, 'message': 'Установка агента запущена'})

@@ -170,6 +170,103 @@ class SSHConnection:
                 'exit_code': -1,
                 'timestamp': datetime.now().isoformat()
             }
+
+    def execute_command_stream(self, command: str, timeout: int = 600, on_output=None) -> Dict:
+        """
+        Выполнить команду на сервере и построчно стримить вывод через callback on_output.
+        Возвращает итог как и обычный execute_command.
+        """
+        if not self.connected or not self.ssh_client:
+            if not self.connect():
+                return {
+                    'success': False,
+                    'error': 'Не удалось установить SSH соединение',
+                    'exit_code': -1
+                }
+        try:
+            self.last_activity = datetime.now()
+            stdin, stdout, stderr = self.ssh_client.exec_command(
+                command,
+                timeout=timeout,
+                get_pty=True
+            )
+            channel = stdout.channel
+            channel.settimeout(1.0)
+
+            start = time.time()
+            collected_output = []
+            collected_error = []
+
+            # Читаем вывод по мере появления
+            while True:
+                if channel.recv_ready():
+                    data = channel.recv(4096)
+                    if not data:
+                        break
+                    text = data.decode('utf-8', errors='ignore')
+                    collected_output.append(text)
+                    if on_output:
+                        # Разбиваем на строки для аккуратной печати
+                        for line in text.split('\n'):
+                            if line.strip():
+                                try:
+                                    on_output(line)
+                                except Exception:
+                                    pass
+
+                if channel.recv_stderr_ready():
+                    data_err = channel.recv_stderr(4096)
+                    if data_err:
+                        err_text = data_err.decode('utf-8', errors='ignore')
+                        collected_error.append(err_text)
+                        if on_output:
+                            for line in err_text.split('\n'):
+                                if line.strip():
+                                    try:
+                                        on_output(line)
+                                    except Exception:
+                                        pass
+
+                if channel.exit_status_ready() and not channel.recv_ready() and not channel.recv_stderr_ready():
+                    break
+
+                if (time.time() - start) > timeout:
+                    try:
+                        channel.close()
+                    except Exception:
+                        pass
+                    return {
+                        'success': False,
+                        'error': f'Команда превысила таймаут {timeout} секунд',
+                        'exit_code': -1,
+                        'timestamp': datetime.now().isoformat(),
+                        'output': ''.join(collected_output)
+                    }
+
+                time.sleep(0.1)
+
+            exit_code = channel.recv_exit_status()
+            return {
+                'success': exit_code == 0,
+                'output': ''.join(collected_output).strip(),
+                'error': ''.join(collected_error).strip() if collected_error else None,
+                'exit_code': exit_code,
+                'timestamp': datetime.now().isoformat()
+            }
+        except socket.timeout:
+            return {
+                'success': False,
+                'error': f'Команда превысила таймаут {timeout} секунд',
+                'exit_code': -1,
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Ошибка выполнения команды: {str(e)}',
+                'exit_code': -1,
+                'timestamp': datetime.now().isoformat()
+            }
     
     def get_sftp(self):
         """Получить SFTP клиент"""

@@ -414,7 +414,9 @@ class ServersManager {
                 this.socket = io();
                 // Progress updates
                 this.socket.on('installation_progress', (data) => {
-                    if (!this.installingServerId || data.server_id !== this.installingServerId) return;
+                    const evId = data && data.server_id != null ? String(data.server_id) : null;
+                    const curId = this.installingServerId != null ? String(this.installingServerId) : null;
+                    if (!curId || evId !== curId) return;
                     const progressFill = document.getElementById('install-progress-fill');
                     const progressPercentage = document.getElementById('install-progress-percentage');
                     if (progressFill && typeof data.progress === 'number') {
@@ -437,7 +439,9 @@ class ServersManager {
                 });
                 // Completion
                 this.socket.on('installation_complete', (data) => {
-                    if (!this.installingServerId || data.server_id !== this.installingServerId) return;
+                    const evId = data && data.server_id != null ? String(data.server_id) : null;
+                    const curId = this.installingServerId != null ? String(this.installingServerId) : null;
+                    if (!curId || evId !== curId) return;
                     const progressFill = document.getElementById('install-progress-fill');
                     const progressPercentage = document.getElementById('install-progress-percentage');
                     if (progressFill) progressFill.style.width = '100%';
