@@ -87,7 +87,54 @@ class RealAgentInstaller:
                     'error': 'Не удалось установить SSH соединение'
                 }
             
-            # Шаг 2: Проверка системных требований
+            # Шаг 2: Проверка пользователя и прав
+            send_progress("Проверка прав", 18, "Проверка текущего пользователя и прав доступа")
+            
+            user_check = conn.execute_command("whoami && id")
+            current_user = user_check['output'].split('\n')[0].strip() if user_check['success'] else 'unknown'
+            
+            # Проверяем наличие sudo
+            sudo_check = conn.execute_command("which sudo")
+            has_sudo = sudo_check['success']
+            
+            # Определяем префикс команд
+            if current_user == 'root':
+                cmd_prefix = ""
+                send_progress("Проверка прав", 19, f"Подключен как root, sudo не требуется", user_check.get('output', ''))
+            elif has_sudo:
+                cmd_prefix = "sudo "
+                send_progress("Проверка прав", 19, f"Пользователь: {current_user}, sudo доступен", user_check.get('output', ''))
+            else:
+                # Пытаемся установить sudo если его нет
+                send_progress("Установка sudo", 19, "sudo не найден, попытка установки...")
+                
+                # Проверяем пакетный менеджер для установки sudo
+                pkg_check = conn.execute_command("which apt-get || which yum || which dnf || which pacman")
+                if pkg_check['success']:
+                    pkg_manager = pkg_check['output'].strip().split('/')[-1]
+                    
+                    if pkg_manager == 'apt-get':
+                        sudo_install = conn.execute_command("apt-get update && apt-get install -y sudo", timeout=120)
+                    elif pkg_manager in ['yum', 'dnf']:
+                        sudo_install = conn.execute_command(f"{pkg_manager} install -y sudo", timeout=120)
+                    elif pkg_manager == 'pacman':
+                        sudo_install = conn.execute_command("pacman -Sy --noconfirm sudo", timeout=120)
+                    
+                    if sudo_install['success']:
+                        cmd_prefix = "sudo "
+                        send_progress("Установка sudo", 19, "sudo успешно установлен", sudo_install.get('output', ''))
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'Нет прав root и не удалось установить sudo. Подключитесь как root или установите sudo вручную.'
+                        }
+                else:
+                    return {
+                        'success': False,
+                        'error': 'Нет прав root, sudo недоступен и неизвестный пакетный менеджер. Подключитесь как root.'
+                    }
+            
+            # Шаг 3: Проверка системных требований
             send_progress("Проверка системы", 20, "Проверка операционной системы и зависимостей")
             
             system_check = conn.execute_command("uname -a && which python3 && which systemctl && python3 --version")
@@ -101,10 +148,10 @@ class RealAgentInstaller:
             os_info = system_check['output'].split('\n')[0]
             send_progress("Проверка системы", 25, f"Система: {os_info}", system_check['output'])
             
-            # Шаг 3: Создание директории агента
+            # Шаг 4: Создание директории агента
             send_progress("Создание директорий", 30, "Создание /opt/xpanel-agent")
             
-            create_dir = conn.execute_command("sudo mkdir -p /opt/xpanel-agent && sudo chmod 755 /opt/xpanel-agent && ls -la /opt/")
+            create_dir = conn.execute_command(f"{cmd_prefix}mkdir -p /opt/xpanel-agent && {cmd_prefix}chmod 755 /opt/xpanel-agent && ls -la /opt/")
             if not create_dir['success']:
                 send_progress("Создание директорий", 30, "Ошибка создания директории", create_dir.get('error', ''), True)
                 return {
@@ -126,17 +173,23 @@ class RealAgentInstaller:
                 
                 if pkg_manager == 'apt-get':
                     send_progress("Установка зависимостей", 43, "Обновление списка пакетов...")
-                    update_result = conn.execute_command("sudo apt-get update -qq", timeout=120)
+                    update_result = conn.execute_command(f"{cmd_prefix}apt-get update -qq", timeout=120)
                     send_progress("Установка зависимостей", 45, "Установка системных пакетов", update_result.get('output', ''))
                     
                     install_deps = conn.execute_command(
-                        "sudo apt-get install -y python3-pip python3-requests python3-psutil",
+                        f"{cmd_prefix}apt-get install -y python3-pip python3-requests python3-psutil",
                         timeout=300
                     )
                 elif pkg_manager in ['yum', 'dnf']:
                     send_progress("Установка зависимостей", 45, f"Установка пакетов через {pkg_manager}")
                     install_deps = conn.execute_command(
-                        f"sudo {pkg_manager} install -y python3-pip python3-requests python3-psutil",
+                        f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil",
+                        timeout=300
+                    )
+                elif pkg_manager == 'pacman':
+                    send_progress("Установка зависимостей", 45, "Установка пакетов через pacman")
+                    install_deps = conn.execute_command(
+                        f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil",
                         timeout=300
                     )
                 else:
@@ -154,7 +207,7 @@ class RealAgentInstaller:
                 # Устанавливаем Python пакеты через pip
                 send_progress("Установка зависимостей", 48, "Установка Python пакетов через pip")
                 pip_install = conn.execute_command(
-                    "sudo python3 -m pip install --upgrade pip && sudo python3 -m pip install requests psutil websocket-client",
+                    f"{cmd_prefix}python3 -m pip install --upgrade pip && {cmd_prefix}python3 -m pip install requests psutil websocket-client",
                     timeout=180
                 )
                 
@@ -192,7 +245,7 @@ AGENT_EOF
             
             # Перемещаем агент в целевую директорию
             send_progress("Создание агента", 67, "Установка агента в /opt/xpanel-agent/")
-            move_agent = conn.execute_command(f"sudo mv {temp_script} /opt/xpanel-agent/agent.py && sudo chmod +x /opt/xpanel-agent/agent.py && ls -la /opt/xpanel-agent/")
+            move_agent = conn.execute_command(f"{cmd_prefix}mv {temp_script} /opt/xpanel-agent/agent.py && {cmd_prefix}chmod +x /opt/xpanel-agent/agent.py && ls -la /opt/xpanel-agent/")
             if not move_agent['success']:
                 send_progress("Создание агента", 67, "Ошибка установки агента", move_agent.get('error', ''), True)
                 return {
@@ -210,18 +263,18 @@ AGENT_EOF
             
             # Создаем сервис
             service_file = "/tmp/xpanel-agent.service"
-            conn.execute_command(f"sudo rm -f {service_file}")
+            conn.execute_command(f"{cmd_prefix}rm -f {service_file}")
             
             for i, line in enumerate(service_lines):
                 escaped_line = line.replace('"', '\\"')
                 if i == 0:
-                    conn.execute_command(f'echo "{escaped_line}" | sudo tee {service_file} > /dev/null')
+                    conn.execute_command(f'echo "{escaped_line}" | {cmd_prefix}tee {service_file} > /dev/null')
                 else:
-                    conn.execute_command(f'echo "{escaped_line}" | sudo tee -a {service_file} > /dev/null')
+                    conn.execute_command(f'echo "{escaped_line}" | {cmd_prefix}tee -a {service_file} > /dev/null')
             
             # Устанавливаем сервис
             send_progress("Настройка сервиса", 77, "Установка systemd сервиса")
-            install_service = conn.execute_command(f"sudo mv {service_file} /etc/systemd/system/xpanel-agent.service && ls -la /etc/systemd/system/xpanel-agent.service")
+            install_service = conn.execute_command(f"{cmd_prefix}mv {service_file} /etc/systemd/system/xpanel-agent.service && ls -la /etc/systemd/system/xpanel-agent.service")
             if not install_service['success']:
                 send_progress("Настройка сервиса", 77, "Ошибка установки сервиса", install_service.get('error', ''), True)
                 return {
@@ -233,7 +286,7 @@ AGENT_EOF
             
             # Перезагружаем systemd
             send_progress("Настройка сервиса", 79, "Перезагрузка systemd daemon")
-            reload_result = conn.execute_command("sudo systemctl daemon-reload")
+            reload_result = conn.execute_command(f"{cmd_prefix}systemctl daemon-reload")
             
             send_progress("Настройка сервиса", 80, "Сервис создан", reload_result.get('output', ''))
             
@@ -241,7 +294,7 @@ AGENT_EOF
             send_progress("Запуск агента", 85, "Включение и запуск сервиса")
             
             # Включаем автозапуск
-            enable_service = conn.execute_command("sudo systemctl enable xpanel-agent")
+            enable_service = conn.execute_command(f"{cmd_prefix}systemctl enable xpanel-agent")
             if not enable_service['success']:
                 send_progress("Запуск агента", 85, "Предупреждение: не удалось включить автозапуск", enable_service.get('error', ''), True)
             else:
@@ -249,7 +302,7 @@ AGENT_EOF
             
             # Запускаем сервис
             send_progress("Запуск агента", 88, "Запуск сервиса xpanel-agent")
-            start_service = conn.execute_command("sudo systemctl start xpanel-agent")
+            start_service = conn.execute_command(f"{cmd_prefix}systemctl start xpanel-agent")
             if not start_service['success']:
                 send_progress("Запуск агента", 88, "Ошибка запуска агента", start_service.get('error', ''), True)
                 return {
@@ -265,10 +318,10 @@ AGENT_EOF
             # Ждем немного для запуска
             time.sleep(3)
             
-            status_check = conn.execute_command("sudo systemctl is-active xpanel-agent")
+            status_check = conn.execute_command(f"{cmd_prefix}systemctl is-active xpanel-agent")
             if status_check['success'] and 'active' in status_check['output']:
                 # Получаем дополнительную информацию
-                info_check = conn.execute_command("sudo systemctl status xpanel-agent --no-pager -l && sudo journalctl -u xpanel-agent --no-pager -n 5")
+                info_check = conn.execute_command(f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l && {cmd_prefix}journalctl -u xpanel-agent --no-pager -n 5")
                 send_progress("Проверка установки", 100, "Агент успешно установлен и запущен", info_check.get('output', ''))
                 
                 return {
@@ -284,7 +337,7 @@ AGENT_EOF
                 }
             else:
                 # Получаем логи для диагностики
-                logs = conn.execute_command("sudo journalctl -u xpanel-agent --no-pager -n 20")
+                logs = conn.execute_command(f"{cmd_prefix}journalctl -u xpanel-agent --no-pager -n 20")
                 
                 return {
                     'success': False,

@@ -918,20 +918,67 @@ class UltraDashboard {
         window.location.href = '/login';
     }
 
-    // Server Actions (placeholders for future implementation)
-    connectToServer(serverId) {
-        console.log('Connecting to server:', serverId);
-        this.showNotification('Terminal connection feature coming soon', 'info');
+    // Server Actions - Real implementations
+    async connectToServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/terminal`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.openTerminalModal(serverId, data.session_id);
+            } else {
+                this.showNotification('Failed to connect to server terminal', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to connect to server:', error);
+            this.showNotification('Connection failed', 'error');
+        }
     }
 
-    manageServer(serverId) {
-        console.log('Managing server:', serverId);
-        this.showNotification('Server management panel coming soon', 'info');
+    async manageServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/services`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+
+            if (response.ok) {
+                const services = await response.json();
+                this.openServerManagementModal(serverId, services);
+            } else {
+                this.showNotification('Failed to load server services', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load server management:', error);
+            this.showNotification('Failed to load server management', 'error');
+        }
     }
 
-    editServer(serverId) {
-        console.log('Editing server:', serverId);
-        this.showNotification('Edit server feature coming soon', 'info');
+    async editServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+
+            if (response.ok) {
+                const server = await response.json();
+                this.openEditServerModal(server);
+            } else {
+                this.showNotification('Failed to load server details', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load server for editing:', error);
+            this.showNotification('Failed to load server details', 'error');
+        }
     }
 
     async deleteServer(serverId) {
@@ -957,9 +1004,95 @@ class UltraDashboard {
         }
     }
 
-    toggleNotifications() {
-        console.log('Toggle notifications');
-        this.showNotification('Notifications panel coming soon', 'info');
+    async toggleNotifications() {
+        try {
+            const response = await fetch('/api/notifications', {
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+
+            if (response.ok) {
+                const notifications = await response.json();
+                this.openNotificationsPanel(notifications);
+            } else {
+                this.showNotification('Failed to load notifications', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load notifications:', error);
+            this.showNotification('Failed to load notifications', 'error');
+        }
+    }
+
+    openTerminalModal(serverId, sessionId) {
+        // Real terminal modal implementation
+        const modal = document.createElement('div');
+        modal.className = 'modal terminal-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Server Terminal - ${serverId}</h3>
+                    <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="terminal-container">
+                    <div id="terminal-${sessionId}" class="terminal"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Initialize real terminal connection
+        this.initializeTerminal(sessionId, serverId);
+    }
+
+    openServerManagementModal(serverId, services) {
+        // Real server management modal
+        const modal = document.createElement('div');
+        modal.className = 'modal management-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Manage Server - ${serverId}</h3>
+                    <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="services-list">
+                    ${services.map(service => `
+                        <div class="service-item">
+                            <span class="service-name">${service.name}</span>
+                            <span class="service-status ${service.status}">${service.status}</span>
+                            <div class="service-actions">
+                                <button onclick="dashboard.controlService('${serverId}', '${service.name}', 'start')">Start</button>
+                                <button onclick="dashboard.controlService('${serverId}', '${service.name}', 'stop')">Stop</button>
+                                <button onclick="dashboard.controlService('${serverId}', '${service.name}', 'restart')">Restart</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async controlService(serverId, serviceName, action) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/services/${serviceName}/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.auth.getToken()}`
+                }
+            });
+
+            if (response.ok) {
+                this.showNotification(`Service ${serviceName} ${action} successful`, 'success');
+                // Refresh services list
+                this.manageServer(serverId);
+            } else {
+                this.showNotification(`Failed to ${action} service ${serviceName}`, 'error');
+            }
+        } catch (error) {
+            console.error(`Failed to ${action} service:`, error);
+            this.showNotification(`Failed to ${action} service`, 'error');
+        }
     }
 }
 

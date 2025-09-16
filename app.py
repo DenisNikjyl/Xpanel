@@ -461,16 +461,182 @@ def agent_heartbeat():
 
 @app.route('/api/agent/register', methods=['POST'])
 def agent_register():
-    """Register new agent"""
+    """Register new agent with real server data"""
     data = request.get_json()
     
     if not data or 'server_id' not in data:
         return jsonify({'success': False, 'error': 'Invalid registration data'}), 400
     
-    # Register agent
-    agent_client.register_agent(data['server_id'], data)
+    server_id = data['server_id']
     
-    return jsonify({'success': True, 'message': 'Agent registered successfully'})
+    # Регистрируем агент с реальными данными
+    server_info = {
+        'id': server_id,
+        'name': data.get('hostname', f'Server-{server_id}'),
+        'ip': data.get('ip_address', ''),
+        'os': data.get('os_info', ''),
+        'cpu_cores': data.get('cpu_cores', 0),
+        'total_memory': data.get('total_memory', 0),
+        'total_disk': data.get('total_disk', 0),
+        'status': 'online',
+        'agent_version': data.get('agent_version', '1.0.0'),
+        'last_seen': datetime.now().isoformat(),
+        'registered_at': datetime.now().isoformat()
+    }
+    
+    # Сохраняем в servers.json
+    try:
+        servers_file = 'servers.json'
+        servers = []
+        
+        if os.path.exists(servers_file):
+            with open(servers_file, 'r', encoding='utf-8') as f:
+                servers = json.load(f)
+        
+        # Проверяем, не зарегистрирован ли уже
+        existing_server = None
+        for i, server in enumerate(servers):
+            if server['id'] == server_id:
+                existing_server = i
+                break
+        
+        if existing_server is not None:
+            servers[existing_server] = server_info
+        else:
+            servers.append(server_info)
+        
+        with open(servers_file, 'w', encoding='utf-8') as f:
+            json.dump(servers, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'Agent registered successfully', 'server_info': server_info})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Registration failed: {str(e)}'}), 500
+
+@app.route('/api/servers/<server_id>/terminal', methods=['POST'])
+def create_terminal_session(server_id):
+    """Create real terminal session for server"""
+    try:
+        session_id = f"term_{server_id}_{int(time.time())}"
+        
+        # Получаем информацию о сервере
+        server = server_manager.get_server_by_id(server_id)
+        if not server:
+            return jsonify({'success': False, 'error': 'Server not found'}), 404
+        
+        # Создаем WebSocket комнату для терминала
+        socketio.emit('terminal_ready', {
+            'session_id': session_id,
+            'server_id': server_id
+        })
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'server_name': server.get('name', server_id)
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/servers/<server_id>/services', methods=['GET'])
+def get_server_services(server_id):
+    """Get real services from server"""
+    try:
+        # Получаем данные агента из кэша
+        if hasattr(server_manager, 'agent_cache') and server_id in server_manager.agent_cache:
+            agent_data = server_manager.agent_cache[server_id]
+            services = agent_data.get('services', [])
+            
+            # Форматируем для фронтенда
+            formatted_services = []
+            for service in services:
+                formatted_services.append({
+                    'name': service.get('name', 'unknown'),
+                    'status': service.get('status', 'unknown'),
+                    'description': service.get('description', ''),
+                    'enabled': service.get('enabled', False)
+                })
+            
+            return jsonify(formatted_services)
+        else:
+            return jsonify([])
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/servers/<server_id>/services/<service_name>/<action>', methods=['POST'])
+def control_service(server_id, service_name, action):
+    """Control service on real server"""
+    try:
+        if action not in ['start', 'stop', 'restart', 'enable', 'disable']:
+            return jsonify({'success': False, 'error': 'Invalid action'}), 400
+        
+        # Отправляем команду агенту через WebSocket
+        socketio.emit('service_control', {
+            'server_id': server_id,
+            'service_name': service_name,
+            'action': action
+        })
+        
+        return jsonify({
+            'success': True,
+            'message': f'Service {service_name} {action} command sent'
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    """Get real notifications from system"""
+    try:
+        notifications = []
+        
+        # Получаем уведомления из кэша агентов
+        if hasattr(server_manager, 'agent_cache'):
+            for server_id, data in server_manager.agent_cache.items():
+                server = server_manager.get_server_by_id(server_id)
+                server_name = server.get('name', server_id) if server else server_id
+                
+                # Проверяем критические состояния
+                if data.get('cpu_percent', 0) > 90:
+                    notifications.append({
+                        'id': f'cpu_{server_id}',
+                        'type': 'warning',
+                        'title': 'High CPU Usage',
+                        'message': f'{server_name}: CPU usage {data["cpu_percent"]}%',
+                        'timestamp': data.get('last_update', datetime.now().isoformat()),
+                        'server_id': server_id
+                    })
+                
+                if data.get('memory_percent', 0) > 90:
+                    notifications.append({
+                        'id': f'memory_{server_id}',
+                        'type': 'critical',
+                        'title': 'High Memory Usage',
+                        'message': f'{server_name}: Memory usage {data["memory_percent"]}%',
+                        'timestamp': data.get('last_update', datetime.now().isoformat()),
+                        'server_id': server_id
+                    })
+                
+                if data.get('disk_percent', 0) > 85:
+                    notifications.append({
+                        'id': f'disk_{server_id}',
+                        'type': 'warning',
+                        'title': 'Low Disk Space',
+                        'message': f'{server_name}: Disk usage {data["disk_percent"]}%',
+                        'timestamp': data.get('last_update', datetime.now().isoformat()),
+                        'server_id': server_id
+                    })
+        
+        # Сортируем по времени (новые первыми)
+        notifications.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return jsonify(notifications)
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
 @jwt_required()

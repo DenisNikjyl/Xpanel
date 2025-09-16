@@ -795,19 +795,37 @@ class ProductionAgent:
                 return False
             
             # Send via HTTP
-            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
-            response = requests.post(
-                url,
-                json=stats,
-                timeout=10,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                self.logger.debug("Heartbeat sent successfully")
-                return True
-            else:
-                self.logger.warning(f"Heartbeat failed: {response.status_code}")
+            try:
+                url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
+                headers = {'Content-Type': 'application/json'}
+                
+                # Добавляем дополнительные реальные данные
+                data = stats
+                data.update({
+                    'timestamp': datetime.now().isoformat(),
+                    'agent_version': '4.0.0',
+                    'hostname': socket.gethostname(),
+                    'ip_address': self.get_local_ip(),
+                    'os_info': f"{platform.system()} {platform.release()}",
+                    'cpu_cores': psutil.cpu_count(),
+                    'total_memory': psutil.virtual_memory().total,
+                    'total_disk': sum([psutil.disk_usage(p.mountpoint).total for p in psutil.disk_partitions()]),
+                    'auth_failures': self.get_auth_failures(),
+                    'network_connections': self.get_network_connections(),
+                    'system_logs': self.get_system_logs()
+                })
+                
+                response = requests.post(url, json=data, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    self.logger.info("Real heartbeat data sent successfully")
+                    return True
+                else:
+                    self.logger.error(f"Failed to send heartbeat: {response.status_code}")
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Error sending heartbeat: {e}")
                 return False
                 
         except Exception as e:
@@ -815,8 +833,9 @@ class ProductionAgent:
             return False
     
     def register_with_panel(self):
-        """Register this agent with the control panel"""
+        """Register this agent with the control panel using real data"""
         try:
+            # Собираем реальную информацию о сервере
             server_info = {
                 'server_id': self.server_id,
                 'hostname': socket.gethostname(),
