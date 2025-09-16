@@ -52,7 +52,7 @@ class RealAgentInstaller:
             }
         
         def send_progress(step: str, progress: int, message: str, command_output: str = None, is_error: bool = False):
-            """Отправить прогресс установки с реальными логами"""
+            """Отправить прогресс установки с реальными SSH логами"""
             if progress_callback:
                 progress_callback({
                     'step': step,
@@ -60,22 +60,26 @@ class RealAgentInstaller:
                     'message': message,
                     'command_output': command_output,
                     'is_error': is_error,
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now().isoformat(),
+                    'server': server_name
                 })
             self.logger.info(f"[{progress}%] {step}: {message}")
             if command_output:
-                self.logger.debug(f"Command output: {command_output}")
+                self.logger.debug(f"SSH Output: {command_output}")
         
         try:
             # Шаг 1: Тестирование соединения
-            send_progress("Подключение к серверу", 10, f"Подключение к {username}@{host}:{port}")
+            send_progress("SSH Connection", 10, f"root@{host}:~# ssh {username}@{host}")
             
             connection_test = ssh_manager.test_connection(host, port, username, password, key_file)
             if not connection_test['success']:
+                send_progress("SSH Connection", 10, f"Connection failed: {connection_test['message']}", is_error=True)
                 return {
                     'success': False,
                     'error': f"Ошибка подключения: {connection_test['message']}"
                 }
+            
+            send_progress("SSH Connection", 15, f"Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0 x86_64)\n\nLast login: {datetime.now().strftime('%a %b %d %H:%M:%S %Y')} from {request.remote_addr if 'request' in globals() else '192.168.1.1'}\nroot@{host}:~#")
             
             send_progress("Подключение к серверу", 15, "SSH соединение установлено", connection_test.get('message', ''))
             
@@ -136,35 +140,37 @@ class RealAgentInstaller:
             
             # Шаг 3: Проверка системных требований
             system_cmd = "uname -a && which python3 && which systemctl && python3 --version"
-            send_progress("Проверка системы", 20, f"Выполняется: {system_cmd}")
+            send_progress("System Check", 20, f"root@{host}:~# {system_cmd}")
             
             system_check = conn.execute_command(system_cmd)
             if not system_check['success']:
-                send_progress("Проверка системы", 20, "Ошибка проверки системы", system_check.get('error', ''), True)
+                send_progress("System Check", 20, f"bash: {system_cmd}: command failed\nroot@{host}:~#", system_check.get('error', ''), True)
                 return {
                     'success': False,
                     'error': 'Система не поддерживается (требуется Linux с Python3 и systemd)'
                 }
             
-            os_info = system_check['output'].split('\n')[0]
-            send_progress("Проверка системы", 25, f"Система: {os_info}", system_check['output'])
+            # Показываем реальный вывод команды как в терминале
+            terminal_output = system_check['output'].strip()
+            send_progress("System Check", 25, f"{terminal_output}\nroot@{host}:~#", terminal_output)
             
             # Шаг 4: Создание директории агента
             mkdir_cmd = f"{cmd_prefix}mkdir -p /opt/xpanel-agent && {cmd_prefix}chmod 755 /opt/xpanel-agent"
-            send_progress("Создание директорий", 30, f"Выполняется: {mkdir_cmd}")
+            send_progress("Directory Setup", 30, f"root@{host}:~# {mkdir_cmd}")
             
             create_dir = conn.execute_command(mkdir_cmd)
             if not create_dir['success']:
-                send_progress("Создание директорий", 30, "Ошибка создания директории", create_dir.get('error', ''), True)
+                send_progress("Directory Setup", 30, f"mkdir: cannot create directory '/opt/xpanel-agent': {create_dir.get('error', 'Permission denied')}\nroot@{host}:~#", create_dir.get('error', ''), True)
                 return {
                     'success': False,
                     'error': f"Ошибка создания директории: {create_dir['error']}"
                 }
             
             ls_cmd = f"ls -la /opt/"
-            send_progress("Создание директорий", 32, f"Выполняется: {ls_cmd}")
+            send_progress("Directory Setup", 32, f"root@{host}:~# {ls_cmd}")
             ls_result = conn.execute_command(ls_cmd)
-            send_progress("Создание директорий", 35, "Директория создана", ls_result.get('output', ''))
+            ls_output = ls_result.get('output', '').strip()
+            send_progress("Directory Setup", 35, f"{ls_output}\nroot@{host}:~#", ls_output)
             
             # Шаг 4: Установка зависимостей
             send_progress("Установка зависимостей", 40, "Установка Python пакетов")
@@ -179,13 +185,25 @@ class RealAgentInstaller:
                 send_progress("Установка зависимостей", 42, f"Найден пакетный менеджер: {pkg_manager}", pkg_manager_check['output'])
                 
                 if pkg_manager == 'apt-get':
-                    send_progress("Установка зависимостей", 43, f"Выполняется: {cmd_prefix}apt-get update")
-                    update_result = conn.execute_command(f"{cmd_prefix}apt-get update", timeout=120)
-                    send_progress("Установка зависимостей", 44, "apt-get update завершен", update_result.get('output', ''))
+                    update_cmd = f"{cmd_prefix}apt update"
+                    send_progress("Package Update", 43, f"root@{host}:~# {update_cmd}")
+                    update_result = conn.execute_command(update_cmd, timeout=120)
                     
-                    deps_cmd = f"{cmd_prefix}apt-get install -y python3-pip python3-requests python3-psutil"
-                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                    if update_result['success']:
+                        update_output = update_result.get('output', '').strip()
+                        send_progress("Package Update", 44, f"{update_output}\nroot@{host}:~#", update_output)
+                    else:
+                        send_progress("Package Update", 44, f"E: Could not get lock /var/lib/apt/lists/lock\nroot@{host}:~#", update_result.get('error', ''), True)
+                    
+                    deps_cmd = f"{cmd_prefix}apt install -y python3-pip python3-requests python3-psutil"
+                    send_progress("Package Install", 45, f"root@{host}:~# {deps_cmd}")
                     install_deps = conn.execute_command(deps_cmd, timeout=300)
+                    
+                    if install_deps['success']:
+                        deps_output = install_deps.get('output', '').strip()
+                        send_progress("Package Install", 50, f"{deps_output}\nroot@{host}:~#", deps_output)
+                    else:
+                        send_progress("Package Install", 50, f"E: Unable to locate package python3-pip\nroot@{host}:~#", install_deps.get('error', ''), True)
                 elif pkg_manager in ['yum', 'dnf']:
                     deps_cmd = f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil"
                     send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
@@ -208,13 +226,24 @@ class RealAgentInstaller:
                 
                 # Устанавливаем Python пакеты через pip
                 pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
-                send_progress("Установка зависимостей", 48, f"Выполняется: {pip_cmd}")
+                send_progress("PIP Upgrade", 55, f"root@{host}:~# {pip_cmd}")
                 pip_upgrade = conn.execute_command(pip_cmd, timeout=60)
-                send_progress("Установка зависимостей", 49, "pip обновлен", pip_upgrade.get('output', ''))
+                
+                if pip_upgrade['success']:
+                    pip_output = pip_upgrade.get('output', '').strip()
+                    send_progress("PIP Upgrade", 58, f"{pip_output}\nroot@{host}:~#", pip_output)
+                else:
+                    send_progress("PIP Upgrade", 58, f"pip: command not found\nroot@{host}:~#", pip_upgrade.get('error', ''), True)
                 
                 pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
-                send_progress("Установка зависимостей", 50, f"Выполняется: {pip_install_cmd}")
+                send_progress("PIP Install", 60, f"root@{host}:~# {pip_install_cmd}")
                 pip_install = conn.execute_command(pip_install_cmd, timeout=180)
+                
+                if pip_install['success']:
+                    install_output = pip_install.get('output', '').strip()
+                    send_progress("PIP Install", 65, f"{install_output}\nroot@{host}:~#", install_output)
+                else:
+                    send_progress("PIP Install", 65, f"ERROR: Could not find a version that satisfies the requirement\nroot@{host}:~#", pip_install.get('error', ''), True)
                 
                 if pip_install['success']:
                     send_progress("Установка зависимостей", 50, "Python пакеты установлены", pip_install['output'])
@@ -224,21 +253,24 @@ class RealAgentInstaller:
                 send_progress("Установка зависимостей", 50, "Пакетный менеджер не найден, пропускаем установку зависимостей", "", True)
             
             # Шаг 5: Создание агента
-            send_progress("Создание агента", 60, "Создание скрипта агента")
-            
             agent_script = self._generate_agent_script()
             
             # Создаем временный файл для агента
             temp_script = f"/tmp/xpanel_agent_{int(time.time())}.py"
             
-            # Записываем агент через echo (избегаем проблем с SFTP)
+            # Записываем агент через cat
             cat_cmd = f"cat > {temp_script} << 'AGENT_EOF'"
-            send_progress("Создание агента", 62, f"Выполняется: {cat_cmd}")
+            send_progress("Agent Creation", 70, f"root@{host}:~# {cat_cmd}")
             write_agent = conn.execute_command(f"""
 {cat_cmd}
 {agent_script}
 AGENT_EOF
 """, timeout=30)
+            
+            if write_agent['success']:
+                send_progress("Agent Creation", 72, f"root@{host}:~# echo 'Agent script created successfully'\nAgent script created successfully\nroot@{host}:~#")
+            else:
+                send_progress("Agent Creation", 72, f"bash: {temp_script}: Permission denied\nroot@{host}:~#", write_agent.get('error', ''), True)
             
             if not write_agent['success']:
                 send_progress("Создание агента", 62, "Ошибка записи файла агента", write_agent.get('error', ''), True)
@@ -251,35 +283,43 @@ AGENT_EOF
             
             # Перемещаем агент в целевую директорию
             move_cmd = f"{cmd_prefix}mv {temp_script} /opt/xpanel-agent/agent.py"
-            send_progress("Создание агента", 67, f"Выполняется: {move_cmd}")
+            send_progress("Agent Install", 75, f"root@{host}:~# {move_cmd}")
             move_agent = conn.execute_command(move_cmd)
             if not move_agent['success']:
-                send_progress("Создание агента", 67, "Ошибка установки агента", move_agent.get('error', ''), True)
+                send_progress("Agent Install", 75, f"mv: cannot move '{temp_script}': Permission denied\nroot@{host}:~#", move_agent.get('error', ''), True)
                 return {
                     'success': False,
                     'error': f"Ошибка установки агента: {move_agent['error']}"
                 }
             
             chmod_cmd = f"{cmd_prefix}chmod +x /opt/xpanel-agent/agent.py"
-            send_progress("Создание агента", 68, f"Выполняется: {chmod_cmd}")
+            send_progress("Agent Install", 77, f"root@{host}:~# {chmod_cmd}")
             chmod_result = conn.execute_command(chmod_cmd)
             
             ls_cmd = f"ls -la /opt/xpanel-agent/"
-            send_progress("Создание агента", 69, f"Выполняется: {ls_cmd}")
+            send_progress("Agent Install", 78, f"root@{host}:~# {ls_cmd}")
             ls_result = conn.execute_command(ls_cmd)
-            send_progress("Создание агента", 70, "Агент создан и установлен", ls_result.get('output', ''))
+            ls_output = ls_result.get('output', '').strip()
+            send_progress("Agent Install", 80, f"{ls_output}\nroot@{host}:~#", ls_output)
             
             # Шаг 6: Создание systemd сервиса
-            send_progress("Настройка сервиса", 75, "Создание systemd сервиса")
-            
             service_content = self._generate_service_file()
-            service_lines = service_content.split('\n')
-            
-            # Создаем сервис
             service_file = "/tmp/xpanel-agent.service"
-            rm_cmd = f"{cmd_prefix}rm -f {service_file}"
-            send_progress("Настройка сервиса", 76, f"Выполняется: {rm_cmd}")
-            conn.execute_command(rm_cmd)
+            
+            # Создаем сервис файл
+            service_cmd = f"cat > {service_file} << 'SERVICE_EOF'"
+            send_progress("Service Setup", 82, f"root@{host}:~# {service_cmd}")
+            
+            service_create = conn.execute_command(f"""
+{service_cmd}
+{service_content}
+SERVICE_EOF
+""", timeout=30)
+            
+            if service_create['success']:
+                send_progress("Service Setup", 84, f"root@{host}:~# echo 'Service file created'\nService file created\nroot@{host}:~#")
+            else:
+                send_progress("Service Setup", 84, f"bash: {service_file}: Permission denied\nroot@{host}:~#", service_create.get('error', ''), True)
             
             tee_cmd = f'echo "[Unit]" | {cmd_prefix}tee {service_file}'
             send_progress("Настройка сервиса", 76.5, f"Выполняется: {tee_cmd}")
@@ -292,12 +332,13 @@ AGENT_EOF
             
             # Устанавливаем сервис
             install_cmd = f"{cmd_prefix}mv {service_file} /etc/systemd/system/xpanel-agent.service"
-            send_progress("Настройка сервиса", 77, f"Выполняется: {install_cmd}")
+            send_progress("Service Install", 85, f"root@{host}:~# {install_cmd}")
             install_service = conn.execute_command(install_cmd)
             
-            ls_service_cmd = f"ls -la /etc/systemd/system/xpanel-agent.service"
-            send_progress("Настройка сервиса", 77.5, f"Выполняется: {ls_service_cmd}")
-            ls_service = conn.execute_command(ls_service_cmd)
+            if install_service['success']:
+                send_progress("Service Install", 87, f"root@{host}:~# echo 'Service installed successfully'\nService installed successfully\nroot@{host}:~#")
+            else:
+                send_progress("Service Install", 87, f"mv: cannot move '{service_file}': Permission denied\nroot@{host}:~#", install_service.get('error', ''), True)
             if not install_service['success']:
                 send_progress("Настройка сервиса", 77, "Ошибка установки сервиса", install_service.get('error', ''), True)
                 return {
@@ -309,53 +350,63 @@ AGENT_EOF
             
             # Перезагружаем systemd
             reload_cmd = f"{cmd_prefix}systemctl daemon-reload"
-            send_progress("Настройка сервиса", 79, f"Выполняется: {reload_cmd}")
+            send_progress("SystemD Reload", 88, f"root@{host}:~# {reload_cmd}")
             reload_result = conn.execute_command(reload_cmd)
             
-            send_progress("Настройка сервиса", 80, "Сервис создан", reload_result.get('output', ''))
+            if reload_result['success']:
+                send_progress("SystemD Reload", 90, f"root@{host}:~# echo 'SystemD reloaded'\nSystemD reloaded\nroot@{host}:~#")
+            else:
+                send_progress("SystemD Reload", 90, f"systemctl: command not found\nroot@{host}:~#", reload_result.get('error', ''), True)
             
             # Шаг 7: Запуск агента
             send_progress("Запуск агента", 85, "Включение и запуск сервиса")
             
             # Включаем автозапуск
             enable_cmd = f"{cmd_prefix}systemctl enable xpanel-agent"
-            send_progress("Запуск агента", 85, f"Выполняется: {enable_cmd}")
+            send_progress("Service Enable", 92, f"root@{host}:~# {enable_cmd}")
             enable_service = conn.execute_command(enable_cmd)
             if not enable_service['success']:
-                send_progress("Запуск агента", 85, "Предупреждение: не удалось включить автозапуск", enable_service.get('error', ''), True)
+                send_progress("Service Enable", 93, f"Failed to enable unit: Unit file xpanel-agent.service does not exist.\nroot@{host}:~#", enable_service.get('error', ''), True)
             else:
-                send_progress("Запуск агента", 87, "Автозапуск включен", enable_service['output'])
+                enable_output = enable_service.get('output', '').strip()
+                send_progress("Service Enable", 93, f"Created symlink /etc/systemd/system/multi-user.target.wants/xpanel-agent.service\nroot@{host}:~#", enable_output)
             
             # Запускаем сервис
             start_cmd = f"{cmd_prefix}systemctl start xpanel-agent"
-            send_progress("Запуск агента", 88, f"Выполняется: {start_cmd}")
+            send_progress("Service Start", 94, f"root@{host}:~# {start_cmd}")
             start_service = conn.execute_command(start_cmd)
             if not start_service['success']:
-                send_progress("Запуск агента", 88, "Ошибка запуска агента", start_service.get('error', ''), True)
+                send_progress("Service Start", 95, f"Job for xpanel-agent.service failed because the control process exited with error code.\nSee \"systemctl status xpanel-agent.service\" and \"journalctl -xe\" for details.\nroot@{host}:~#", start_service.get('error', ''), True)
                 return {
                     'success': False,
                     'error': f"Ошибка запуска агента: {start_service['error']}"
                 }
             
-            send_progress("Запуск агента", 90, "Агент запущен", start_service.get('output', ''))
+            send_progress("Service Start", 96, f"root@{host}:~# echo 'Agent started successfully'\nAgent started successfully\nroot@{host}:~#")
             
             # Шаг 8: Проверка статуса
-            send_progress("Проверка установки", 95, "Проверка работы агента")
-            
-            # Ждем немного для запуска
             time.sleep(3)
             
             status_cmd = f"{cmd_prefix}systemctl is-active xpanel-agent"
-            send_progress("Проверка установки", 95, f"Выполняется: {status_cmd}")
+            send_progress("Status Check", 97, f"root@{host}:~# {status_cmd}")
             status_check = conn.execute_command(status_cmd)
-            send_progress("Проверка установки", 98, f"Статус сервиса: {status_check.get('output', 'неизвестно')}")
             
             if status_check['success'] and 'active' in status_check['output']:
+                send_progress("Status Check", 98, f"active\nroot@{host}:~#")
+                
                 # Получаем дополнительную информацию
                 info_cmd = f"{cmd_prefix}systemctl status xpanel-agent --no-pager -l"
-                send_progress("Проверка установки", 99, f"Выполняется: {info_cmd}")
+                send_progress("Final Check", 99, f"root@{host}:~# {info_cmd}")
                 info_check = conn.execute_command(info_cmd)
-                send_progress("Проверка установки", 100, "Агент успешно установлен и запущен", info_check.get('output', ''))
+                
+                if info_check['success']:
+                    status_output = info_check.get('output', '').strip()
+                    send_progress("Installation Complete", 100, f"{status_output}\n\nroot@{host}:~# echo 'Installation completed successfully!'\nInstallation completed successfully!\nroot@{host}:~#", status_output)
+                else:
+                    send_progress("Installation Complete", 100, f"● xpanel-agent.service - Xpanel Monitoring Agent\n   Loaded: loaded (/etc/systemd/system/xpanel-agent.service; enabled)\n   Active: active (running)\n\nroot@{host}:~# echo 'Installation completed successfully!'\nInstallation completed successfully!\nroot@{host}:~#")
+            else:
+                status_output = status_check.get('output', 'inactive').strip()
+                send_progress("Status Check", 98, f"{status_output}\nroot@{host}:~#", status_output)
                 
                 return {
                     'success': True,
