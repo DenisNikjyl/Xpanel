@@ -210,6 +210,106 @@ def execute_custom_action():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@app.route('/api/install-agent', methods=['POST'])
+@jwt_required()
+def install_agent():
+    """Install agent with real-time progress via WebSocket"""
+    try:
+        data = request.get_json()
+        
+        # Получаем информацию о сервере
+        server_config = {
+            'host': data.get('host'),
+            'port': data.get('port', 22),
+            'username': data.get('username'),
+            'password': data.get('password'),
+            'key_file': data.get('key_file'),
+            'name': data.get('name', f"Server-{data.get('host')}")
+        }
+        
+        # Функция обратного вызова для отправки прогресса через WebSocket
+        def progress_callback(progress_data):
+            socketio.emit('installation_progress', progress_data)
+        
+        # Запускаем установку в отдельном потоке
+        def install_in_background():
+            try:
+                installer = RealAgentInstaller()
+                result = installer.install_agent(server_config, progress_callback)
+                
+                if result['success']:
+                    socketio.emit('installation_complete', {
+                        'success': True,
+                        'message': result['message'],
+                        'server_info': result.get('server_info', {})
+                    })
+                else:
+                    socketio.emit('installation_error', {
+                        'success': False,
+                        'error': result['error']
+                    })
+            except Exception as e:
+                socketio.emit('installation_error', {
+                    'success': False,
+                    'error': f'Ошибка установки агента: {str(e)}'
+                })
+        
+        # Запускаем установку в фоновом режиме
+        import threading
+        thread = threading.Thread(target=install_in_background)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Установка агента запущена'
+        })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Ошибка запуска установки агента: {str(e)}'
+        }), 500
+
+@app.route('/api/servers/<int:server_id>/install-agent', methods=['POST'])
+@jwt_required()
+def install_agent_on_server(server_id):
+    """Install agent on specific server"""
+    try:
+        data = request.get_json()
+        
+        # Получаем информацию о сервере
+        server_config = {
+            'host': data.get('host'),
+            'port': data.get('port', 22),
+            'username': data.get('username'),
+            'password': data.get('password'),
+            'key_file': data.get('key_file'),
+            'name': data.get('name', f"Server-{server_id}")
+        }
+        
+        # Устанавливаем агент
+        installer = RealAgentInstaller()
+        result = installer.install_agent(server_config)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'server_info': result.get('server_info', {})
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Ошибка установки агента: {str(e)}'
+        }), 500
+
 @app.route('/api/servers/install-agent', methods=['POST'])
 @jwt_required()
 def install_agent_remote():
@@ -698,21 +798,23 @@ def execute_server_command():
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    print(f'Client connected: {request.sid}')
-    emit('connected', {'status': 'Connected to Xpanel'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Handle client disconnection"""
-    print(f'Client disconnected: {request.sid}')
+    print('Client disconnected')
 
 @socketio.on('join_room')
 def handle_join_room(data):
-    """Handle client joining a room for server-specific updates"""
     room = data.get('room')
     if room:
         join_room(room)
-        emit('joined_room', {'room': room})
+        print(f'Client joined room: {room}')
+
+@socketio.on('cancel_installation')
+def handle_cancel_installation(data):
+    server_id = data.get('server_id')
+    print(f'Installation cancelled for server: {server_id}')
+    # Здесь можно добавить логику отмены установки
 
 # Settings API endpoints
 @app.route('/api/settings', methods=['GET'])

@@ -417,40 +417,130 @@ class UltraDashboard {
         document.body.style.overflow = 'hidden';
 
         // Start installation
-        this.performAgentInstallation(server);
+        this.showInstallProgress(serverData);
+    }
+
+    showInstallProgress(serverData) {
+        const modal = document.getElementById('installProgressModal');
+        const progressBar = document.getElementById('installProgressBar');
+        const progressPercent = document.getElementById('installProgressPercent');
+        const terminalOutput = document.getElementById('terminalOutput');
+        const cancelBtn = document.getElementById('cancelInstallBtn');
+        
+        modal.style.display = 'block';
+        
+        // Сброс состояния
+        progressBar.style.width = '0%';
+        progressPercent.textContent = '0%';
+        terminalOutput.innerHTML = '';
+        this.installationCancelled = false;
+        
+        // Реальная установка через WebSocket
+        this.startRealInstallation(serverData);
+        
+        // Обработчик отмены
+        cancelBtn.onclick = () => {
+            this.installationCancelled = true;
+            modal.style.display = 'none';
+            // Отправляем сигнал отмены на сервер
+            if (this.socket) {
+                this.socket.emit('cancel_installation', { server_id: serverData.id });
+            }
+        };
+    }
+    
+    startRealInstallation(serverData) {
+        // Подключаемся к WebSocket для получения real-time логов
+        if (!this.socket) {
+            this.socket = io();
+        }
+        
+        // Слушаем события установки
+        this.socket.on('installation_progress', (data) => {
+            if (this.installationCancelled) return;
+            
+            this.updateInstallProgress(data);
+        });
+        
+        this.socket.on('installation_complete', (data) => {
+            if (this.installationCancelled) return;
+            
+            this.handleInstallationComplete(data);
+        });
+        
+        this.socket.on('installation_error', (data) => {
+            if (this.installationCancelled) return;
+            
+            this.handleInstallationError(data);
+        });
+        
+        // Запускаем установку
+        fetch('/api/install-agent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.auth.getToken()}`
+            },
+            body: JSON.stringify(serverData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                this.addTerminalMessage('Ошибка', data.error || 'Неизвестная ошибка установки', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Installation error:', error);
+            this.addTerminalMessage('Ошибка', 'Ошибка запуска установки: ' + error.message, 'error');
+        });
+    }
+    
+    updateInstallProgress(data) {
+        const progressBar = document.getElementById('installProgressBar');
+        const progressPercent = document.getElementById('installProgressPercent');
+        
+        // Обновляем прогресс-бар
+        progressBar.style.width = data.progress + '%';
+        progressPercent.textContent = data.progress + '%';
+        
+        // Добавляем основное сообщение
+        const messageType = data.is_error ? 'error' : 'info';
+        this.addTerminalMessage(data.step, data.message, messageType);
+        
+        // Добавляем вывод команды если есть
+        if (data.command_output && data.command_output.trim()) {
+            this.addTerminalOutput(data.command_output);
+        }
+    }
+    
+    handleInstallationComplete(data) {
+        this.addTerminalMessage('Завершение', 'Установка агента завершена успешно!', 'success');
+        
+        setTimeout(() => {
+            const modal = document.getElementById('installProgressModal');
+            modal.style.display = 'none';
+            this.refreshDashboard();
+        }, 2000);
+    }
+    
+    handleInstallationError(data) {
+        this.addTerminalMessage('Ошибка', data.error || 'Произошла ошибка установки', 'error');
+        
+        setTimeout(() => {
+            const modal = document.getElementById('installProgressModal');
+            modal.style.display = 'none';
+        }, 3000);
     }
 
     async performAgentInstallation(server) {
-        const terminal = document.getElementById('install-terminal');
-        const progressFill = document.getElementById('install-progress-fill');
-        const progressPercentage = document.getElementById('install-progress-percentage');
+        const serverData = {
+            host: server.host,
+            port: server.port,
+            username: server.username,
+            password: server.password,
+            key_file: server.key_file
+        };
 
-        const steps = [
-            { text: 'Connecting to server...', delay: 1000 },
-            { text: 'Checking system requirements...', delay: 1500 },
-            { text: 'Downloading agent files...', delay: 2000 },
-            { text: 'Installing dependencies...', delay: 2500 },
-            { text: 'Configuring agent service...', delay: 1500 },
-            { text: 'Starting agent...', delay: 1000 },
-            { text: 'Verifying connection...', delay: 1500 }
-        ];
-
-        let currentStep = 0;
-        const totalSteps = steps.length;
-
-        for (const step of steps) {
-            this.addTerminalLine(`[INFO] ${step.text}`, 'info');
-            
-            // Update progress
-            const progress = Math.round(((currentStep + 1) / totalSteps) * 100);
-            if (progressFill) progressFill.style.width = `${progress}%`;
-            if (progressPercentage) progressPercentage.textContent = `${progress}%`;
-
-            await this.delay(step.delay);
-            currentStep++;
-        }
-
-        // Make actual API call
         try {
             const response = await fetch(`/api/servers/${server.id}/install-agent`, {
                 method: 'POST',
@@ -458,13 +548,7 @@ class UltraDashboard {
                     'Authorization': `Bearer ${this.auth.getToken()}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    host: server.host,
-                    port: server.port,
-                    username: server.username,
-                    password: server.password,
-                    key_file: server.key_file
-                })
+                body: JSON.stringify(serverData)
             });
 
             const result = await response.json();
@@ -488,6 +572,45 @@ class UltraDashboard {
         // Enable close button
         const closeBtn = document.querySelector('#install-agent-modal .modal-close');
         if (closeBtn) closeBtn.disabled = false;
+    }
+
+    addTerminalOutput(output) {
+        const terminalOutput = document.getElementById('terminalOutput');
+        if (!terminalOutput) return;
+        
+        const lines = output.split('\n');
+        lines.forEach(line => {
+            if (line.trim()) {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'terminal-output';
+                outputLine.textContent = line;
+                terminalOutput.appendChild(outputLine);
+            }
+        });
+        
+        // Прокручиваем вниз
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    addTerminalMessage(step, message, type = 'info') {
+        const terminalOutput = document.getElementById('terminalOutput');
+        if (!terminalOutput) return;
+
+        const line = document.createElement('div');
+        line.className = `terminal-line terminal-${type}`;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        const prefix = type === 'error' ? '[ERROR]' : type === 'success' ? '[SUCCESS]' : '[INFO]';
+        
+        line.innerHTML = `
+            <span class="terminal-timestamp">[${timestamp}]</span>
+            <span class="terminal-prefix ${type}">${prefix}</span>
+            <span class="terminal-step">${step}:</span>
+            <span class="terminal-message">${message}</span>
+        `;
+        
+        terminalOutput.appendChild(line);
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
     addTerminalLine(text, type = 'info') {

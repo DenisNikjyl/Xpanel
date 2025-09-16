@@ -1453,6 +1453,68 @@ body {
     cursor: not-allowed;
 }
 
+/* Real-time installation terminal styles */
+.terminal-line {
+    margin-bottom: 2px;
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.terminal-timestamp {
+    color: #6e7681;
+    margin-right: 8px;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.terminal-prefix {
+    margin-right: 8px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.terminal-prefix.info {
+    color: #79c0ff;
+}
+
+.terminal-prefix.error {
+    color: #f85149;
+}
+
+.terminal-prefix.success {
+    color: #56d364;
+}
+
+.terminal-step {
+    color: #ffa657;
+    margin-right: 8px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.terminal-message {
+    color: #c9d1d9;
+    flex: 1;
+}
+
+.terminal-output {
+    color: #8b949e;
+    margin-left: 20px;
+    font-size: 11px;
+    white-space: pre-wrap;
+    background: rgba(13, 17, 23, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 2px;
+    border-left: 2px solid #30363d;
+    width: calc(100% - 20px);
+    overflow-wrap: break-word;
+}
+
 .connection-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -8,3 +8,5 @@ python-dotenv==1.0.0
 bcrypt==4.0.1
 eventlet==0.33.3
 requests==2.31.0
+websocket-client==1.6.4
+uptime==3.0.1

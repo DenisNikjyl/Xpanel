@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Xpanel Agent - Advanced VPS Server Agent
-Version: 3.0.0 (Production Ready)
-This agent runs on VPS servers and provides comprehensive monitoring and management
+Xpanel Production Agent - Полноценный агент для мониторинга серверов
+Версия: 4.0.0 (Production Ready)
+Собирает реальные данные системы и отправляет на панель управления
 """
 
 import os
@@ -16,11 +16,9 @@ import subprocess
 import threading
 import signal
 import platform
-import shutil
-import glob
+import logging
 from datetime import datetime, timedelta
 import argparse
-import logging
 from logging.handlers import RotatingFileHandler
 import hashlib
 import uuid
@@ -30,8 +28,9 @@ import sqlite3
 from pathlib import Path
 import websocket
 import ssl
+from urllib.parse import urlparse
 
-class XpanelAgent:
+class ProductionAgent:
     def __init__(self, panel_address="localhost", panel_port=5000, server_id=None, config_file=None):
         self.panel_address = panel_address
         self.panel_port = panel_port
@@ -40,6 +39,9 @@ class XpanelAgent:
         self.heartbeat_interval = 30  # seconds
         self.config_file = config_file or '/opt/xpanel-agent/config.json'
         self.db_file = '/opt/xpanel-agent/agent.db'
+        
+        # Создаем директории если их нет
+        os.makedirs('/opt/xpanel-agent/logs', exist_ok=True)
         
         # Load configuration
         self.config = self.load_config()
@@ -52,18 +54,13 @@ class XpanelAgent:
         # Initialize database
         self.init_database()
         
-        # Setup advanced logging
+        # Setup logging
         self.setup_logging()
         
         # Performance monitoring
         self.last_network_stats = None
         self.last_disk_stats = None
         self.performance_history = []
-        self.max_history_size = 1000
-        
-        # Process monitoring
-        self.monitored_processes = self.config.get('monitored_processes', [])
-        self.process_alerts = self.config.get('process_alerts', {})
         
         # System alerts
         self.alert_thresholds = self.config.get('alert_thresholds', {
@@ -73,30 +70,18 @@ class XpanelAgent:
             'load': 5.0
         })
         
-        # Command execution history
-        self.command_history = []
-        self.max_command_history = 100
-        
-        # Security monitoring
-        self.security_events = []
-        self.failed_login_attempts = 0
-        
-        # Service management
-        self.managed_services = self.config.get('managed_services', [])
-        
         # WebSocket connection
         self.ws = None
         self.ws_connected = False
         self.ws_thread = None
         
-        self.logger.info(f"Xpanel Agent v3.0.0 initialized (ID: {self.server_id})")
+        self.logger.info(f"Production Agent v4.0.0 initialized (ID: {self.server_id})")
         
     def generate_server_id(self):
         """Generate unique server ID based on hostname and MAC address"""
         hostname = socket.gethostname()
         try:
             # Get MAC address of first network interface
-            import uuid
             mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
                            for elements in range(0,2*6,2)][::-1])
             return f"{hostname}-{mac}"
@@ -117,15 +102,12 @@ class XpanelAgent:
             'panel_address': 'localhost',
             'panel_port': 5000,
             'heartbeat_interval': 30,
-            'monitored_processes': [],
-            'managed_services': [],
             'alert_thresholds': {
                 'cpu': 80,
                 'memory': 85,
                 'disk': 90,
                 'load': 5.0
             },
-            'security_monitoring': True,
             'log_level': 'INFO'
         }
     
@@ -139,7 +121,7 @@ class XpanelAgent:
             self.logger.error(f"Failed to save config: {e}")
     
     def setup_logging(self):
-        """Setup advanced logging with rotation"""
+        """Setup logging with rotation"""
         log_dir = '/opt/xpanel-agent/logs'
         os.makedirs(log_dir, exist_ok=True)
         
@@ -161,7 +143,7 @@ class XpanelAgent:
         console_handler.setFormatter(formatter)
         
         # Configure logger
-        self.logger = logging.getLogger('XpanelAgent')
+        self.logger = logging.getLogger('ProductionAgent')
         self.logger.setLevel(getattr(logging, self.config.get('log_level', 'INFO')))
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
@@ -195,17 +177,6 @@ class XpanelAgent:
                     output TEXT,
                     exit_code INTEGER,
                     execution_time REAL
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS security_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    description TEXT,
-                    severity TEXT,
-                    source_ip TEXT
                 )
             ''')
             
@@ -252,7 +223,7 @@ class XpanelAgent:
                         'free': usage.free,
                         'percent': round((usage.used / usage.total) * 100, 1)
                     }
-                except PermissionError:
+                except (PermissionError, OSError):
                     continue
             
             # Network stats with interface details
@@ -291,9 +262,6 @@ class XpanelAgent:
             # System temperatures (if available)
             temperatures = self.get_system_temperatures()
             
-            # System services status
-            services_status = self.get_services_status()
-            
             # Disk I/O stats
             disk_io = psutil.disk_io_counters()
             
@@ -305,7 +273,7 @@ class XpanelAgent:
                 'timestamp': datetime.now().isoformat(),
                 'hostname': socket.gethostname(),
                 'ip_address': self.get_local_ip(),
-                'agent_version': '3.0.0',
+                'agent_version': '4.0.0',
                 'cpu': {
                     'usage': round(sum(cpu_percent) / len(cpu_percent), 1),
                     'usage_per_core': [round(x, 1) for x in cpu_percent],
@@ -351,7 +319,6 @@ class XpanelAgent:
                     'top_memory': top_processes['memory']
                 },
                 'temperatures': temperatures,
-                'services': services_status,
                 'system_info': {
                     'platform': platform.system(),
                     'platform_release': platform.release(),
@@ -416,29 +383,6 @@ class XpanelAgent:
         except (AttributeError, OSError):
             pass
         return {}
-    
-    def get_services_status(self):
-        """Get status of managed services"""
-        services = {}
-        for service in self.managed_services:
-            try:
-                result = subprocess.run(
-                    ['systemctl', 'is-active', service],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                services[service] = {
-                    'status': result.stdout.strip(),
-                    'active': result.returncode == 0
-                }
-            except Exception as e:
-                services[service] = {
-                    'status': 'unknown',
-                    'active': False,
-                    'error': str(e)
-                }
-        return services
     
     def calculate_network_speed(self, current_stats):
         """Calculate network speed based on previous stats"""
@@ -578,7 +522,7 @@ class XpanelAgent:
             self.logger.error(f"Error storing alerts: {e}")
     
     def execute_command(self, command, timeout=30):
-        """Execute shell command with enhanced logging and security"""
+        """Execute shell command with security checks"""
         start_time = time.time()
         
         # Security check - block dangerous commands
@@ -685,6 +629,228 @@ class XpanelAgent:
         except Exception as e:
             self.logger.error(f"Error storing command history: {e}")
     
+    def get_detailed_processes(self):
+        """Get detailed process information"""
+        try:
+            processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 
+                                           'username', 'status', 'create_time', 'cmdline']):
+                try:
+                    pinfo = proc.info
+                    pinfo['create_time'] = datetime.fromtimestamp(pinfo['create_time']).isoformat()
+                    pinfo['cmdline'] = ' '.join(pinfo['cmdline']) if pinfo['cmdline'] else ''
+                    processes.append(pinfo)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            
+            return {'processes': processes}
+        except Exception as e:
+            self.logger.error(f"Error getting detailed processes: {e}")
+            return {'processes': []}
+    
+    def manage_service(self, service_name, action):
+        """Manage system services"""
+        try:
+            valid_actions = ['start', 'stop', 'restart', 'enable', 'disable', 'status']
+            if action not in valid_actions:
+                return {'success': False, 'error': f'Invalid action: {action}'}
+            
+            cmd = f"systemctl {action} {service_name}"
+            result = subprocess.run(
+                cmd.split(),
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            return {
+                'success': result.returncode == 0,
+                'output': result.stdout,
+                'error': result.stderr,
+                'exit_code': result.returncode
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def get_system_services(self):
+        """Get list of system services"""
+        try:
+            result = subprocess.run(
+                ['systemctl', 'list-units', '--type=service', '--no-pager'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                services = []
+                lines = result.stdout.split('\n')[1:]  # Skip header
+                
+                for line in lines:
+                    if line.strip() and not line.startswith('●'):
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            services.append({
+                                'name': parts[0].replace('.service', ''),
+                                'load': parts[1],
+                                'active': parts[2],
+                                'sub': parts[3],
+                                'description': ' '.join(parts[4:]) if len(parts) > 4 else ''
+                            })
+                
+                return {'services': services}
+            else:
+                return {'services': [], 'error': result.stderr}
+                
+        except Exception as e:
+            return {'services': [], 'error': str(e)}
+    
+    def get_system_logs(self, log_file='/var/log/syslog', lines=100):
+        """Get system logs"""
+        try:
+            if not os.path.exists(log_file):
+                return {'error': f'Log file {log_file} not found'}
+            
+            cmd = f"tail -n {lines} {log_file}"
+            result = subprocess.run(
+                cmd.split(),
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                return {'logs': result.stdout.split('\n')}
+            else:
+                return {'error': result.stderr}
+                
+        except Exception as e:
+            return {'error': str(e)}
+    
+    def get_network_connections(self):
+        """Get detailed network connections"""
+        try:
+            connections = []
+            for conn in psutil.net_connections(kind='inet'):
+                try:
+                    connections.append({
+                        'fd': conn.fd,
+                        'family': conn.family.name if conn.family else 'unknown',
+                        'type': conn.type.name if conn.type else 'unknown',
+                        'local_address': f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else '',
+                        'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else '',
+                        'status': conn.status,
+                        'pid': conn.pid
+                    })
+                except (psutil.AccessDenied, AttributeError):
+                    continue
+            
+            return {'connections': connections}
+        except Exception as e:
+            self.logger.error(f"Error getting network connections: {e}")
+            return {'connections': []}
+    
+    def get_disk_info(self):
+        """Get detailed disk information"""
+        try:
+            disks = []
+            for partition in psutil.disk_partitions():
+                try:
+                    usage = psutil.disk_usage(partition.mountpoint)
+                    disks.append({
+                        'device': partition.device,
+                        'mountpoint': partition.mountpoint,
+                        'fstype': partition.fstype,
+                        'opts': partition.opts,
+                        'total': usage.total,
+                        'used': usage.used,
+                        'free': usage.free,
+                        'percent': round((usage.used / usage.total) * 100, 1)
+                    })
+                except (PermissionError, OSError):
+                    continue
+            
+            return {'disks': disks}
+        except Exception as e:
+            self.logger.error(f"Error getting disk info: {e}")
+            return {'disks': []}
+    
+    def get_local_ip(self):
+        """Get local IP address"""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+    
+    def send_heartbeat(self):
+        """Send heartbeat with system stats to panel"""
+        try:
+            stats = self.get_system_stats()
+            if not stats:
+                return False
+            
+            # Send via HTTP
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
+            response = requests.post(
+                url,
+                json=stats,
+                timeout=10,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 200:
+                self.logger.debug("Heartbeat sent successfully")
+                return True
+            else:
+                self.logger.warning(f"Heartbeat failed: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error sending heartbeat: {e}")
+            return False
+    
+    def register_with_panel(self):
+        """Register this agent with the control panel"""
+        try:
+            server_info = {
+                'server_id': self.server_id,
+                'hostname': socket.gethostname(),
+                'ip_address': self.get_local_ip(),
+                'os_info': {
+                    'system': platform.system(),
+                    'release': platform.release(),
+                    'version': platform.version(),
+                    'machine': platform.machine(),
+                    'processor': platform.processor()
+                },
+                'agent_version': '4.0.0',
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/register"
+            response = requests.post(
+                url,
+                json=server_info,
+                timeout=10,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 200:
+                self.logger.info("Successfully registered with control panel")
+                return True
+            else:
+                self.logger.error(f"Registration failed: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error registering with panel: {e}")
+            return False
+    
     def setup_websocket(self):
         """Setup WebSocket connection for real-time communication"""
         try:
@@ -765,10 +931,17 @@ class XpanelAgent:
                     'logs': logs
                 })
             
-            elif event == "update_config":
-                new_config = payload.get('config', {})
-                self.update_agent_config(new_config)
-                self.send_websocket_response("config_updated", {"success": True})
+            elif event == "get_services":
+                services = self.get_system_services()
+                self.send_websocket_response("services_data", services)
+            
+            elif event == "get_network_connections":
+                connections = self.get_network_connections()
+                self.send_websocket_response("network_connections", connections)
+            
+            elif event == "get_disk_info":
+                disk_info = self.get_disk_info()
+                self.send_websocket_response("disk_info", disk_info)
                 
         except Exception as e:
             self.logger.error(f"Error handling WebSocket command: {e}")
@@ -781,186 +954,6 @@ class XpanelAgent:
                 self.ws.send(message)
         except Exception as e:
             self.logger.error(f"Error sending WebSocket response: {e}")
-    
-    def get_detailed_processes(self):
-        """Get detailed process information"""
-        try:
-            processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 
-                                           'username', 'status', 'create_time', 'cmdline']):
-                try:
-                    pinfo = proc.info
-                    pinfo['create_time'] = datetime.fromtimestamp(pinfo['create_time']).isoformat()
-                    pinfo['cmdline'] = ' '.join(pinfo['cmdline']) if pinfo['cmdline'] else ''
-                    processes.append(pinfo)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-            
-            return {'processes': processes}
-        except Exception as e:
-            self.logger.error(f"Error getting detailed processes: {e}")
-            return {'processes': []}
-    
-    def manage_service(self, service_name, action):
-        """Manage system services"""
-        try:
-            valid_actions = ['start', 'stop', 'restart', 'enable', 'disable', 'status']
-            if action not in valid_actions:
-                return {'success': False, 'error': f'Invalid action: {action}'}
-            
-            cmd = f"systemctl {action} {service_name}"
-            result = subprocess.run(
-                cmd.split(),
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            return {
-                'success': result.returncode == 0,
-                'output': result.stdout,
-                'error': result.stderr,
-                'exit_code': result.returncode
-            }
-            
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def get_system_logs(self, log_file, lines=100):
-        """Get system logs"""
-        try:
-            if not os.path.exists(log_file):
-                return {'error': f'Log file {log_file} not found'}
-            
-            cmd = f"tail -n {lines} {log_file}"
-            result = subprocess.run(
-                cmd.split(),
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return {'logs': result.stdout.split('\n')}
-            else:
-                return {'error': result.stderr}
-                
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def update_agent_config(self, new_config):
-        """Update agent configuration"""
-        try:
-            self.config.update(new_config)
-            self.save_config()
-            
-            # Apply configuration changes
-            if 'heartbeat_interval' in new_config:
-                self.heartbeat_interval = new_config['heartbeat_interval']
-            
-            if 'alert_thresholds' in new_config:
-                self.alert_thresholds.update(new_config['alert_thresholds'])
-            
-            if 'managed_services' in new_config:
-                self.managed_services = new_config['managed_services']
-                
-        except Exception as e:
-            self.logger.error(f"Error updating config: {e}")
-    
-    def send_heartbeat(self):
-        """Send heartbeat with system stats to panel"""
-        try:
-            stats = self.get_system_stats()
-            if not stats:
-                return False
-            
-            # Send via HTTP
-            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/heartbeat"
-            response = requests.post(
-                url,
-                json=stats,
-                timeout=10,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                self.logger.debug("Heartbeat sent successfully")
-                
-                # Also send via WebSocket if connected
-                if self.ws_connected:
-                    self.send_websocket_response("server_stats", stats)
-                
-                return True
-            else:
-                self.logger.warning(f"Heartbeat failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error sending heartbeat: {e}")
-            return False
-    
-    def register_with_panel(self):
-        """Register this agent with the control panel"""
-        try:
-            server_info = {
-                'server_id': self.server_id,
-                'hostname': socket.gethostname(),
-                'ip_address': self.get_local_ip(),
-                'os_info': self.get_os_info(),
-                'agent_version': '3.0.0',
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/register"
-            response = requests.post(
-                url,
-                json=server_info,
-                timeout=10,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                self.logger.info("Successfully registered with control panel")
-                return True
-            else:
-                self.logger.error(f"Registration failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error registering with panel: {e}")
-            return False
-    
-    def get_local_ip(self):
-        """Get local IP address"""
-        try:
-            # Connect to a remote address to determine local IP
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except:
-            return "127.0.0.1"
-    
-    def get_os_info(self):
-        """Get operating system information"""
-        try:
-            return {
-                'system': platform.system(),
-                'release': platform.release(),
-                'version': platform.version(),
-                'machine': platform.machine(),
-                'processor': platform.processor(),
-                'python_version': platform.python_version()
-            }
-        except:
-            return {'system': 'Unknown'}
-    
-    def heartbeat_loop(self):
-        """Main heartbeat loop"""
-        while self.running:
-            self.send_heartbeat()
-            time.sleep(self.heartbeat_interval)
     
     def websocket_loop(self):
         """WebSocket connection loop"""
@@ -975,6 +968,22 @@ class XpanelAgent:
                 self.logger.error(f"WebSocket loop error: {e}")
                 time.sleep(10)
     
+    def heartbeat_loop(self):
+        """Main heartbeat loop"""
+        while self.running:
+            success = self.send_heartbeat()
+            
+            # Also send via WebSocket if connected
+            if self.ws_connected and success:
+                try:
+                    stats = self.get_system_stats()
+                    if stats:
+                        self.send_websocket_response("server_stats", stats)
+                except Exception as e:
+                    self.logger.error(f"Error sending WebSocket stats: {e}")
+            
+            time.sleep(self.heartbeat_interval)
+    
     def signal_handler(self, signum, frame):
         """Handle system signals for graceful shutdown"""
         self.logger.info(f"Received signal {signum}, shutting down...")
@@ -982,7 +991,7 @@ class XpanelAgent:
     
     def start(self):
         """Start the agent"""
-        self.logger.info(f"Starting Xpanel Agent v3.0.0 (ID: {self.server_id})")
+        self.logger.info(f"Starting Production Agent v4.0.0 (ID: {self.server_id})")
         self.logger.info(f"Panel address: {self.panel_address}:{self.panel_port}")
         
         # Setup signal handlers
@@ -991,7 +1000,7 @@ class XpanelAgent:
         
         # Register with panel
         if not self.register_with_panel():
-            self.logger.error("Failed to register with panel, continuing anyway...")
+            self.logger.warning("Failed to register with panel, continuing anyway...")
         
         self.running = True
         
@@ -1015,15 +1024,10 @@ class XpanelAgent:
     def stop(self):
         """Stop the agent"""
         self.running = False
-        
-        # Close WebSocket connection
-        if self.ws:
-            self.ws.close()
-        
         self.logger.info("Agent stopped")
 
 def main():
-    parser = argparse.ArgumentParser(description='Xpanel VPS Agent v3.0.0')
+    parser = argparse.ArgumentParser(description='Xpanel Production Agent v4.0.0')
     parser.add_argument('--panel-address', default='localhost',
                        help='Control panel IP address')
     parser.add_argument('--panel-port', type=int, default=5000,
@@ -1040,7 +1044,7 @@ def main():
     args = parser.parse_args()
     
     # Create agent instance
-    agent = XpanelAgent(
+    agent = ProductionAgent(
         panel_address=args.panel_address,
         panel_port=args.panel_port,
         server_id=args.server_id,
@@ -1058,137 +1062,6 @@ def main():
                 agent.start()
         except ImportError:
             agent.logger.error("python-daemon not installed, running in foreground")
-            agent.start()
-    else:
-        agent.start()
-
-if __name__ == '__main__':
-    main()
-                return True
-            else:
-                self.logger.warning(f"Heartbeat failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error sending heartbeat: {e}")
-            return False
-    
-    def register_with_panel(self):
-        """Register this agent with the control panel"""
-        try:
-            server_info = {
-                'server_id': self.server_id,
-                'hostname': socket.gethostname(),
-                'ip_address': self.get_local_ip(),
-                'os_info': self.get_os_info(),
-                'agent_version': '1.0.0',
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            url = f"http://{self.panel_address}:{self.panel_port}/api/agent/register"
-            response = requests.post(
-                url,
-                json=server_info,
-                timeout=10,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                self.logger.info("Successfully registered with control panel")
-                return True
-            else:
-                self.logger.error(f"Registration failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error registering with panel: {e}")
-            return False
-    
-    def get_local_ip(self):
-        """Get local IP address"""
-        try:
-            # Connect to a remote address to determine local IP
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except:
-            return "127.0.0.1"
-    
-    def get_os_info(self):
-        """Get operating system information"""
-        try:
-            import platform
-            return {
-                'system': platform.system(),
-                'release': platform.release(),
-                'version': platform.version(),
-                'machine': platform.machine(),
-                'processor': platform.processor()
-            }
-        except:
-            return {'system': 'Unknown'}
-    
-    def heartbeat_loop(self):
-        """Main heartbeat loop"""
-        while self.running:
-            self.send_heartbeat()
-            time.sleep(self.heartbeat_interval)
-    
-    def start(self):
-        """Start the agent"""
-        self.logger.info(f"Starting Xpanel Agent (ID: {self.server_id})")
-        self.logger.info(f"Panel address: {self.panel_address}:{self.panel_port}")
-        
-        # Register with panel
-        if not self.register_with_panel():
-            self.logger.error("Failed to register with panel, continuing anyway...")
-        
-        self.running = True
-        
-        # Start heartbeat thread
-        heartbeat_thread = threading.Thread(target=self.heartbeat_loop, daemon=True)
-        heartbeat_thread.start()
-        
-        self.logger.info("Agent started successfully")
-        
-        try:
-            while self.running:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            self.logger.info("Received interrupt signal, stopping agent...")
-            self.stop()
-    
-    def stop(self):
-        """Stop the agent"""
-        self.running = False
-        self.logger.info("Agent stopped")
-
-def main():
-    parser = argparse.ArgumentParser(description='Xpanel VPS Agent')
-    parser.add_argument('--panel-address', default='64.188.70.12',
-                       help='Control panel IP address')
-    parser.add_argument('--panel-port', type=int, default=5000,
-                       help='Control panel port')
-    parser.add_argument('--server-id', 
-                       help='Custom server ID (auto-generated if not provided)')
-    parser.add_argument('--daemon', action='store_true',
-                       help='Run as daemon')
-    
-    args = parser.parse_args()
-    
-    # Create agent instance
-    agent = XpanelAgent(
-        panel_address=args.panel_address,
-        panel_port=args.panel_port,
-        server_id=args.server_id
-    )
-    
-    if args.daemon:
-        # Run as daemon (simplified version)
-        import daemon
-        with daemon.DaemonContext():
             agent.start()
     else:
         agent.start()
