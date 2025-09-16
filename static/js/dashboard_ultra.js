@@ -68,7 +68,7 @@ class UltraDashboard {
         try {
             await this.loadStats();
             await this.loadServers();
-            this.updateUI();
+            // this.updateUI(); // Removed as this method doesn't exist
         } catch (error) {
             console.error('Failed to load dashboard:', error);
             this.showNotification('Failed to load dashboard', 'error');
@@ -105,7 +105,8 @@ class UltraDashboard {
             });
 
             if (response.ok) {
-                this.servers = await response.json();
+                const data = await response.json();
+                this.servers = Array.isArray(data) ? data : (data.servers || []);
                 this.renderServers();
             } else if (response.status === 401) {
                 this.auth.logout();
@@ -148,6 +149,25 @@ class UltraDashboard {
         });
     }
 
+    filterServers() {
+        if (!Array.isArray(this.servers)) {
+            return [];
+        }
+        
+        const searchTerm = this.searchTerm ? this.searchTerm.toLowerCase() : '';
+        const statusFilter = this.statusFilter || 'all';
+        
+        return this.servers.filter(server => {
+            const matchesSearch = !searchTerm || 
+                server.name.toLowerCase().includes(searchTerm) ||
+                server.host.toLowerCase().includes(searchTerm);
+            
+            const matchesStatus = statusFilter === 'all' || server.status === statusFilter;
+            
+            return matchesSearch && matchesStatus;
+        });
+    }
+
     renderServers() {
         const container = document.getElementById('servers-container');
         if (!container) return;
@@ -168,6 +188,38 @@ class UltraDashboard {
 
         // Animate cards in
         this.animateCardsIn();
+    }
+
+    displayEmptyServers() {
+        const container = document.getElementById('servers-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h3>No servers found</h3>
+                <p>Add your first server to get started with monitoring</p>
+                <button class="btn btn-primary" onclick="dashboard.showAddServerModal()">
+                    <i class="fas fa-plus"></i> Add Server
+                </button>
+            </div>
+        `;
+    }
+
+    animateCardsIn() {
+        const cards = document.querySelectorAll('.server-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.3s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
     }
 
     createServerCard(server) {

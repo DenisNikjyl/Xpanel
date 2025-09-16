@@ -687,20 +687,129 @@ class ServerManager:
             raise Exception(f'Failed to remove agent: {str(e)}')
     
     def get_server_stats(self, server_id):
-        """Get server statistics"""
-        if server_id not in self.servers:
-            return {'error': 'Server not found'}
+        """Get real server statistics from agent"""
+        try:
+            # Получаем данные от агента через WebSocket или HTTP
+            server = self.get_server_by_id(server_id)
+            if not server:
+                return None
+            
+            # Здесь должен быть запрос к агенту на сервере
+            # Пока возвращаем реальные данные из кэша агента
+            agent_data = self.agent_cache.get(server_id, {})
+            
+            if agent_data:
+                return {
+                    'system': {
+                        'cpu_percent': agent_data.get('cpu_percent', 0),
+                        'memory_percent': agent_data.get('memory_percent', 0),
+                        'disk_percent': agent_data.get('disk_percent', 0),
+                        'network': agent_data.get('network', {}),
+                        'uptime': agent_data.get('uptime', 0)
+                    },
+                    'processes': agent_data.get('processes', []),
+                    'services': agent_data.get('services', [])
+                }
+            
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting server stats: {e}")
+            return None
+
+    def get_server_security(self, server_id):
+        """Get security data from server agent"""
+        try:
+            server = self.get_server_by_id(server_id)
+            if not server:
+                return None
+            
+            # Получаем данные безопасности от агента
+            agent_data = self.agent_cache.get(server_id, {})
+            
+            if agent_data:
+                return {
+                    'processes': agent_data.get('processes', []),
+                    'auth_failures': agent_data.get('auth_failures', []),
+                    'network_connections': agent_data.get('network_connections', []),
+                    'system_logs': agent_data.get('system_logs', [])
+                }
+            
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting server security data: {e}")
+            return None
+
+    def update_agent_data(self, server_id, data):
+        """Update agent data cache"""
+        if not hasattr(self, 'agent_cache'):
+            self.agent_cache = {}
         
-        # Return mock stats for now
-        return {
-            'cpu_usage': 25.5,
-            'memory_usage': 67.2,
-            'disk_usage': 45.8,
-            'network_rx': 1024,
-            'network_tx': 2048,
-            'uptime': '5 days, 12:34:56'
+        self.agent_cache[server_id] = {
+            'cpu_percent': data.get('cpu_percent', 0),
+            'memory_percent': data.get('memory_percent', 0),
+            'disk_percent': data.get('disk_percent', 0),
+            'network': data.get('network', {}),
+            'processes': data.get('processes', []),
+            'services': data.get('services', []),
+            'auth_failures': data.get('auth_failures', []),
+            'network_connections': data.get('network_connections', []),
+            'system_logs': data.get('system_logs', []),
+            'uptime': data.get('uptime', 0),
+            'last_update': datetime.now().isoformat()
         }
-    
+
+    def update_server_status(self, server_id, status):
+        """Update server status"""
+        try:
+            servers_file = 'servers.json'
+            servers = []
+            
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    servers = json.load(f)
+            
+            # Находим и обновляем сервер
+            for server in servers:
+                if server['id'] == server_id:
+                    server['status'] = status
+                    server['last_seen'] = datetime.now().isoformat()
+                    break
+            
+            # Сохраняем обновленные данные
+            with open(servers_file, 'w', encoding='utf-8') as f:
+                json.dump(servers, f, ensure_ascii=False, indent=2)
+                
+        except Exception as e:
+            self.logger.error(f"Error updating server status: {e}")
+
+    def get_server_by_id(self, server_id):
+        """Get server by ID"""
+        try:
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    servers = json.load(f)
+                
+                for server in servers:
+                    if server['id'] == server_id:
+                        return server
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting server by ID: {e}")
+            return None
+
+    def get_all_servers(self):
+        """Get all servers"""
+        try:
+            servers_file = 'servers.json'
+            if os.path.exists(servers_file):
+                with open(servers_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            self.logger.error(f"Error getting all servers: {e}")
+            return []
+
     def execute_command(self, server_id, command):
         """Execute command on server"""
         if server_id not in self.servers:

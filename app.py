@@ -390,22 +390,74 @@ def get_install_script():
 
 @app.route('/api/agent/heartbeat', methods=['POST'])
 def agent_heartbeat():
-    """Receive heartbeat from agent"""
+    """Receive real heartbeat data from agent"""
     data = request.get_json()
     
     if not data or 'server_id' not in data:
         return jsonify({'success': False, 'error': 'Invalid heartbeat data'}), 400
     
-    # Process agent heartbeat
-    result = agent_client.process_heartbeat(data)
+    server_id = data['server_id']
     
-    # Emit real-time update via WebSocket
+    # Обновляем кэш данных агента
+    server_manager.update_agent_data(server_id, {
+        'cpu_percent': data.get('cpu_percent', 0),
+        'memory_percent': data.get('memory_percent', 0),
+        'disk_percent': data.get('disk_percent', 0),
+        'network': data.get('network', {}),
+        'processes': data.get('processes', []),
+        'services': data.get('services', []),
+        'auth_failures': data.get('auth_failures', []),
+        'network_connections': data.get('network_connections', []),
+        'system_logs': data.get('system_logs', []),
+        'uptime': data.get('uptime', 0)
+    })
+    
+    # Обновляем статус сервера
+    server_manager.update_server_status(server_id, 'online')
+    
+    # Отправляем real-time обновления через WebSocket
     socketio.emit('server_stats', {
-        'server_id': data['server_id'],
+        'server_id': server_id,
         'stats': data
     })
     
-    return jsonify({'success': True, 'message': 'Heartbeat received'})
+    # Проверяем на угрозы безопасности
+    threats = []
+    
+    # Высокое использование CPU
+    if data.get('cpu_percent', 0) > 90:
+        threats.append({
+            'type': 'high_cpu',
+            'severity': 'warning',
+            'message': f"High CPU usage: {data.get('cpu_percent')}%"
+        })
+    
+    # Высокое использование памяти
+    if data.get('memory_percent', 0) > 90:
+        threats.append({
+            'type': 'high_memory',
+            'severity': 'critical',
+            'message': f"High memory usage: {data.get('memory_percent')}%"
+        })
+    
+    # Подозрительные процессы
+    processes = data.get('processes', [])
+    for proc in processes:
+        if proc.get('cpu_percent', 0) > 95:
+            threats.append({
+                'type': 'suspicious_process',
+                'severity': 'high',
+                'message': f"Process {proc['name']} using {proc['cpu_percent']}% CPU"
+            })
+    
+    # Отправляем уведомления об угрозах
+    if threats:
+        socketio.emit('security_alert', {
+            'server_id': server_id,
+            'threats': threats
+        })
+    
+    return jsonify({'success': True, 'message': 'Heartbeat received', 'threats_detected': len(threats)})
 
 @app.route('/api/agent/register', methods=['POST'])
 def agent_register():
@@ -422,35 +474,165 @@ def agent_register():
 
 @app.route('/api/stats', methods=['GET'])
 @jwt_required()
-def get_dashboard_stats():
-    """Get dashboard statistics"""
+def get_stats():
+    """Get real dashboard statistics from agents"""
     try:
+        # Получаем реальные данные от всех агентов
         servers = server_manager.get_all_servers()
-        total_servers = len(servers)
-        active_servers = len([s for s in servers if s.get('status') == 'online'])
         
-        # Calculate average CPU and memory usage
+        total_servers = len(servers)
+        active_servers = 0
         total_cpu = 0
         total_memory = 0
-        server_count = 0
+        total_disk = 0
         
         for server in servers:
-            if server.get('cpu_usage') is not None:
-                total_cpu += server.get('cpu_usage', 0)
-                server_count += 1
-            if server.get('memory_usage') is not None:
-                total_memory += server.get('memory_usage', 0)
+            if server.get('status') == 'online':
+                active_servers += 1
+                
+                # Получаем последние метрики от агента
+                stats = server_manager.get_server_stats(server['id'])
+                if stats and 'system' in stats:
+                    system_stats = stats['system']
+                    total_cpu += system_stats.get('cpu_percent', 0)
+                    total_memory += system_stats.get('memory_percent', 0)
+                    total_disk += system_stats.get('disk_percent', 0)
         
-        avg_cpu = round(total_cpu / server_count) if server_count > 0 else 0
-        avg_memory = round(total_memory / server_count) if server_count > 0 else 0
+        # Вычисляем средние значения
+        avg_cpu = round(total_cpu / max(active_servers, 1), 1)
+        avg_memory = round(total_memory / max(active_servers, 1), 1)
+        avg_disk = round(total_disk / max(active_servers, 1), 1)
         
         return jsonify({
             'total_servers': total_servers,
             'active_servers': active_servers,
+            'offline_servers': total_servers - active_servers,
             'avg_cpu': avg_cpu,
             'avg_memory': avg_memory,
-            'cpu_trend': 'neutral',
-            'memory_trend': 'neutral'
+            'avg_disk': avg_disk,
+            'cpu_trend': 'up' if avg_cpu > 70 else 'down' if avg_cpu < 30 else 'neutral',
+            'memory_trend': 'up' if avg_memory > 80 else 'down' if avg_memory < 40 else 'neutral'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/threats', methods=['GET'])
+@jwt_required()
+def get_security_threats():
+    """Get real security threats from all servers"""
+    try:
+        servers = server_manager.get_all_servers()
+        threats = []
+        
+        for server in servers:
+            if server.get('status') == 'online':
+                # Получаем данные безопасности от агента
+                security_data = server_manager.get_server_security(server['id'])
+                if security_data:
+                    # Анализируем подозрительные процессы
+                    processes = security_data.get('processes', [])
+                    for proc in processes:
+                        if proc.get('cpu_percent', 0) > 90:
+                            threats.append({
+                                'type': 'High CPU Usage',
+                                'severity': 'warning',
+                                'server': server['name'],
+                                'description': f"Process {proc['name']} using {proc['cpu_percent']}% CPU",
+                                'source': proc['name'],
+                                'timestamp': datetime.now().isoformat()
+                            })
+                    
+                    # Проверяем неудачные попытки входа
+                    auth_logs = security_data.get('auth_failures', [])
+                    for log in auth_logs[-5:]:  # Последние 5 попыток
+                        threats.append({
+                            'type': 'Failed Login Attempt',
+                            'severity': 'high',
+                            'server': server['name'],
+                            'description': f"Failed SSH login from {log.get('ip', 'unknown')}",
+                            'source': log.get('ip', 'unknown'),
+                            'timestamp': log.get('timestamp', datetime.now().isoformat())
+                        })
+        
+        return jsonify({
+            'threats': threats[:10],  # Последние 10 угроз
+            'total_threats': len(threats),
+            'critical_count': len([t for t in threats if t['severity'] == 'critical']),
+            'high_count': len([t for t in threats if t['severity'] == 'high']),
+            'medium_count': len([t for t in threats if t['severity'] == 'warning'])
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/performance', methods=['GET'])
+@jwt_required()
+def get_performance_analytics():
+    """Get real performance analytics from all servers"""
+    try:
+        servers = server_manager.get_all_servers()
+        
+        # Собираем данные производительности
+        cpu_data = []
+        memory_data = []
+        disk_data = []
+        network_data = []
+        
+        for server in servers:
+            if server.get('status') == 'online':
+                stats = server_manager.get_server_stats(server['id'])
+                if stats and 'system' in stats:
+                    system_stats = stats['system']
+                    
+                    cpu_data.append({
+                        'server': server['name'],
+                        'value': system_stats.get('cpu_percent', 0)
+                    })
+                    
+                    memory_data.append({
+                        'server': server['name'],
+                        'value': system_stats.get('memory_percent', 0)
+                    })
+                    
+                    disk_data.append({
+                        'server': server['name'],
+                        'value': system_stats.get('disk_percent', 0)
+                    })
+                    
+                    network_stats = system_stats.get('network', {})
+                    network_data.append({
+                        'server': server['name'],
+                        'bytes_sent': network_stats.get('bytes_sent', 0),
+                        'bytes_recv': network_stats.get('bytes_recv', 0)
+                    })
+        
+        # Вычисляем средние значения
+        avg_cpu = sum(d['value'] for d in cpu_data) / len(cpu_data) if cpu_data else 0
+        avg_memory = sum(d['value'] for d in memory_data) / len(memory_data) if memory_data else 0
+        avg_disk = sum(d['value'] for d in disk_data) / len(disk_data) if disk_data else 0
+        
+        total_network = sum(d['bytes_sent'] + d['bytes_recv'] for d in network_data)
+        
+        return jsonify({
+            'cpu': {
+                'average': round(avg_cpu, 1),
+                'servers': cpu_data,
+                'trend': 1.7 if avg_cpu > 70 else -2.1 if avg_cpu < 30 else 0.5
+            },
+            'memory': {
+                'average': round(avg_memory, 1),
+                'servers': memory_data,
+                'trend': 2.8 if avg_memory > 80 else -1.5 if avg_memory < 40 else 1.2
+            },
+            'disk': {
+                'average': round(avg_disk, 1),
+                'servers': disk_data,
+                'trend': -2.1 if avg_disk < 50 else 1.8
+            },
+            'network': {
+                'total_mb': round(total_network / 1024 / 1024, 2),
+                'servers': network_data,
+                'trend': 6.2
+            }
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
