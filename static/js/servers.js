@@ -525,10 +525,17 @@ class ServersManager {
     updateStats(stats = null) {
         if (stats) {
             // Use stats from API if provided
-            document.getElementById('total-servers')?.textContent = stats.total_servers || 0;
-            document.getElementById('online-servers')?.textContent = stats.online_servers || 0;
-            document.getElementById('offline-servers')?.textContent = stats.offline_servers || 0;
-            document.getElementById('agents-installed')?.textContent = stats.agents_installed || 0;
+            const totalElement = document.getElementById('total-servers');
+            if (totalElement) totalElement.textContent = stats.total_servers || 0;
+            
+            const onlineElement = document.getElementById('online-servers');
+            if (onlineElement) onlineElement.textContent = stats.online_servers || 0;
+            
+            const offlineElement = document.getElementById('offline-servers');
+            if (offlineElement) offlineElement.textContent = stats.offline_servers || 0;
+            
+            const agentsElement = document.getElementById('agents-installed');
+            if (agentsElement) agentsElement.textContent = stats.agents_installed || 0;
         } else {
             // Calculate from local servers data
             const totalServers = this.servers.length;
@@ -536,10 +543,17 @@ class ServersManager {
             const offlineServers = this.servers.filter(s => s.status === 'offline').length;
             const agentsInstalled = this.servers.filter(s => s.agent_status === 'installed').length;
 
-            document.getElementById('total-servers')?.textContent = totalServers;
-            document.getElementById('online-servers')?.textContent = onlineServers;
-            document.getElementById('offline-servers')?.textContent = offlineServers;
-            document.getElementById('agents-installed')?.textContent = agentsInstalled;
+            const totalElement2 = document.getElementById('total-servers');
+            if (totalElement2) totalElement2.textContent = totalServers;
+            
+            const onlineElement2 = document.getElementById('online-servers');
+            if (onlineElement2) onlineElement2.textContent = onlineServers;
+            
+            const offlineElement2 = document.getElementById('offline-servers');
+            if (offlineElement2) offlineElement2.textContent = offlineServers;
+            
+            const agentsElement2 = document.getElementById('agents-installed');
+            if (agentsElement2) agentsElement2.textContent = agentsInstalled;
         }
     }
 
