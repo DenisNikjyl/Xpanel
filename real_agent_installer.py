@@ -138,6 +138,11 @@ class RealAgentInstaller:
                         'error': 'Нет прав root, sudo недоступен и неизвестный пакетный менеджер. Подключитесь как root.'
                     }
             
+            # Режим выполнения через screen (по умолчанию включен)
+            use_screen = bool(server_config.get('use_screen', True))
+            # Определяем идентификатор для именования screen-сессии и логов
+            sid = str(server_config.get('id') or server_config.get('server_id') or server_name).replace(' ', '_')
+            
             # Шаг 3: Проверка системных требований
             system_cmd = "uname -a && which python3 && which systemctl && python3 --version"
             send_progress("System Check", 20, f"root@{host}:~# {system_cmd}")
@@ -213,40 +218,125 @@ class RealAgentInstaller:
                 
                 send_progress("Установка зависимостей", 42, f"Найден пакетный менеджер: {pkg_manager}", pkg_manager_check['output'])
                 
-                if pkg_manager == 'apt-get':
-                    # apt update (со стримингом вывода)
-                    update_cmd = f"{cmd_prefix}apt update"
-                    update_result = stream_and_progress(update_cmd, "Package Update", 43, 45, timeout=1800)
-                    # apt install (со стримингом вывода)
-                    deps_cmd = f"{cmd_prefix}apt install -y python3-pip python3-requests python3-psutil"
-                    install_deps = stream_and_progress(deps_cmd, "Package Install", 45, 55, timeout=3600)
-                elif pkg_manager in ['yum', 'dnf']:
-                    deps_cmd = f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil"
-                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
-                    install_deps = conn.execute_command(deps_cmd, timeout=300)
-                elif pkg_manager == 'pacman':
-                    deps_cmd = f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil"
-                    send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
-                    install_deps = conn.execute_command(deps_cmd, timeout=300)
-                else:
-                    send_progress("Установка зависимостей", 40, "Неподдерживаемый пакетный менеджер", pkg_manager_check['output'], True)
+                # Вспомогательная функция: выполнить список команд внутри screen и
+                # построчно стримить tail -F лога в прогресс
+                def run_screen_script(commands: list, step: str, start_progress: int, end_progress: int) -> Dict:
+                    log_dir = "/var/log/xpanel"
+                    log_file = f"{log_dir}/install-{sid}.log"
+                    session_name = f"Xpanel_{sid}"
+                    # Подготовка лог-директории и screen
+                    conn.execute_command(f"{cmd_prefix}mkdir -p {log_dir} && {cmd_prefix}chmod 777 {log_dir}")
+                    # Устанавливаем screen при необходимости
+                    if pkg_manager == 'apt-get':
+                        conn.execute_command(f"{cmd_prefix}bash -lc 'command -v screen >/dev/null || (apt update && apt install -y screen)'", timeout=600)
+                    elif pkg_manager in ['yum', 'dnf']:
+                        conn.execute_command(f"{cmd_prefix}bash -lc 'command -v screen >/dev/null || ({pkg_manager} install -y screen)'", timeout=600)
+                    # Пишем скрипт на сервере
+                    script_path = f"/tmp/xpanel_install_run_{sid}.sh"
+                    script_body = "\n".join(commands + [
+                        "EXIT=$?",
+                        "echo __XPNL_DONE__:$EXIT"
+                    ])
+                    conn.execute_command(f"bash -lc 'cat > {script_path} <<\'EOF\'\n#!/usr/bin/env bash\nset -o pipefail\nset +e\n{script_body}\nEOF'", timeout=30)
+                    conn.execute_command(f"{cmd_prefix}chmod +x {script_path}")
+                    # Стартуем screen-сессию с логированием
+                    start_cmd = f"screen -S {session_name} -dm -L -Logfile {log_file} bash -lc '{cmd_prefix}bash {script_path}'"
+                    conn.execute_command(start_cmd, timeout=10)
+                    
+                    current = start_progress
+                    increment = max(0.2, (end_progress - start_progress) / 300.0)
+                    done_code = None
+                    
+                    def on_line(line: str):
+                        nonlocal current, done_code
+                        if line.strip().startswith("__XPNL_DONE__:"):
+                            try:
+                                done_code = int(line.strip().split(":", 1)[1])
+                            except Exception:
+                                done_code = 1
+                        else:
+                            if current < end_progress:
+                                current = min(end_progress, current + increment)
+                            send_progress(step, int(current), line, command_output=line)
+                    
+                    # Стримим лог до маркера завершения
+                    tail_cmd = f"bash -lc 'touch {log_file}; tail -n +1 -F {log_file} | sed \"/__XPNL_DONE__/q\"'"
+                    conn.execute_command_stream(tail_cmd, timeout=7200, on_output=on_line)
+                    
+                    if int(current) < end_progress:
+                        send_progress(step, end_progress, "Завершение этапа установки через screen")
                     return {
-                        'success': False,
-                        'error': 'Неподдерживаемый пакетный менеджер'
+                        'success': (done_code is not None and done_code == 0),
+                        'exit_code': done_code if done_code is not None else -1,
+                        'log_file': log_file,
+                        'session': session_name
                     }
+                
+                # Формируем команды для установки зависимостей и pip
+                if use_screen and pkg_manager == 'apt-get':
+                    cmds = [
+                        f"{cmd_prefix}apt update",
+                        f"{cmd_prefix}apt install -y python3-pip python3-requests python3-psutil",
+                        f"{cmd_prefix}python3 -m pip install --upgrade pip",
+                        f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                    ]
+                    screen_res = run_screen_script(cmds, "Package Install (screen)", 43, 60)
+                    install_deps = {'success': screen_res.get('success', False), 'output': f"screen:{screen_res.get('session')} log:{screen_res.get('log_file')}"}
+                elif use_screen and pkg_manager in ['yum', 'dnf']:
+                    cmds = [
+                        f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil",
+                        f"{cmd_prefix}python3 -m pip install --upgrade pip",
+                        f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                    ]
+                    screen_res = run_screen_script(cmds, "Package Install (screen)", 43, 60)
+                    install_deps = {'success': screen_res.get('success', False), 'output': f"screen:{screen_res.get('session')} log:{screen_res.get('log_file')}"}
+                elif use_screen and pkg_manager == 'pacman':
+                    cmds = [
+                        f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil",
+                        f"{cmd_prefix}python3 -m pip install --upgrade pip",
+                        f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                    ]
+                    screen_res = run_screen_script(cmds, "Package Install (screen)", 43, 60)
+                    install_deps = {'success': screen_res.get('success', False), 'output': f"screen:{screen_res.get('session')} log:{screen_res.get('log_file')}"}
+                else:
+                    # Обычный путь со стримингом без screen
+                    if pkg_manager == 'apt-get':
+                        update_cmd = f"{cmd_prefix}apt update"
+                        stream_and_progress(update_cmd, "Package Update", 43, 45, timeout=1800)
+                        deps_cmd = f"{cmd_prefix}apt install -y python3-pip python3-requests python3-psutil"
+                        install_deps = stream_and_progress(deps_cmd, "Package Install", 45, 55, timeout=3600)
+                        # pip
+                        pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
+                        stream_and_progress(pip_cmd, "PIP Upgrade", 55, 60, timeout=1200)
+                        pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                        stream_and_progress(pip_install_cmd, "PIP Install", 60, 65, timeout=2400)
+                    elif pkg_manager in ['yum', 'dnf']:
+                        deps_cmd = f"{cmd_prefix}{pkg_manager} install -y python3-pip python3-requests python3-psutil"
+                        send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                        install_deps = conn.execute_command(deps_cmd, timeout=300)
+                        pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
+                        stream_and_progress(pip_cmd, "PIP Upgrade", 55, 60, timeout=1200)
+                        pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                        stream_and_progress(pip_install_cmd, "PIP Install", 60, 65, timeout=2400)
+                    elif pkg_manager == 'pacman':
+                        deps_cmd = f"{cmd_prefix}pacman -Sy --noconfirm python-pip python-requests python-psutil"
+                        send_progress("Установка зависимостей", 45, f"Выполняется: {deps_cmd}")
+                        install_deps = conn.execute_command(deps_cmd, timeout=300)
+                        pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
+                        stream_and_progress(pip_cmd, "PIP Upgrade", 55, 60, timeout=1200)
+                        pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
+                        stream_and_progress(pip_install_cmd, "PIP Install", 60, 65, timeout=2400)
+                    else:
+                        send_progress("Установка зависимостей", 40, "Неподдерживаемый пакетный менеджер", pkg_manager_check['output'], True)
+                        return {
+                            'success': False,
+                            'error': 'Неподдерживаемый пакетный менеджер'
+                        }
                 
                 if install_deps['success']:
                     send_progress("Установка зависимостей", 47, "Системные пакеты установлены", install_deps['output'])
                 else:
                     send_progress("Установка зависимостей", 47, "Ошибка установки системных пакетов", install_deps.get('error', ''), True)
-                
-                # Устанавливаем Python пакеты через pip
-                # pip upgrade (стриминг)
-                pip_cmd = f"{cmd_prefix}python3 -m pip install --upgrade pip"
-                stream_and_progress(pip_cmd, "PIP Upgrade", 55, 60, timeout=1200)
-                # pip install (стриминг)
-                pip_install_cmd = f"{cmd_prefix}python3 -m pip install requests psutil websocket-client"
-                stream_and_progress(pip_install_cmd, "PIP Install", 60, 65, timeout=2400)
             else:
                 send_progress("Установка зависимостей", 50, "Пакетный менеджер не найден, пропускаем установку зависимостей", "", True)
             

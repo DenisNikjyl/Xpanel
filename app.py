@@ -139,7 +139,10 @@ def install_agent_legacy(server_id):
             'username': server['username'],
             'password': server.get('password'),
             'key_file': server.get('key_file'),
-            'name': server['name']
+            'name': server['name'],
+            'id': str(server_id),
+            'server_id': str(server_id),
+            'use_screen': True
         }
         
         # Прогресс коллбек для отправки real-time логов через Socket.IO
