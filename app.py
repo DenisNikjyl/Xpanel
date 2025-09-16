@@ -279,7 +279,6 @@ def install_agent_remote():
     
     host = data.get('host')
     port = data.get('port', 22)
-{{ ... }}
     username = data.get('username')
     password = data.get('password')
     key_file = data.get('key_file')
