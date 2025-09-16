@@ -958,17 +958,17 @@ class UltraDashboard {
         this.showNotification('Starting agent installation...', 'info');
         
         try {
-            const response = await fetch('/api/install-agent', {
+            const response = await fetch(`/api/servers/${serverId}/install-agent`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.auth.getToken()}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ server_id: serverId })
+                }
             });
 
             if (response.ok) {
-                this.showInstallationProgress(serverId);
+                const result = await response.json();
+                this.showInstallationProgress(serverId, result);
             } else {
                 this.showNotification('Failed to start installation', 'error');
             }
@@ -978,14 +978,14 @@ class UltraDashboard {
         }
     }
 
-    showInstallationProgress(serverId) {
+    showInstallationProgress(serverId, result) {
         // Create installation progress modal
         const modal = document.createElement('div');
         modal.className = 'modal installation-modal';
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Installing Agent - ${serverId}</h3>
+                    <h3><i class="fas fa-download"></i> Installing Agent on ${serverId}</h3>
                     <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
                 </div>
                 <div class="installation-progress">
@@ -993,41 +993,66 @@ class UltraDashboard {
                         <div class="progress-fill" style="width: 0%"></div>
                     </div>
                     <div class="progress-text">0% - Initializing...</div>
-                    <div class="terminal-output" id="install-terminal-${serverId}"></div>
+                    <div class="terminal-container">
+                        <div class="terminal-header">
+                            <div class="terminal-buttons">
+                                <span class="terminal-button red"></span>
+                                <span class="terminal-button yellow"></span>
+                                <span class="terminal-button green"></span>
+                            </div>
+                            <span class="terminal-title">Agent Installation</span>
+                        </div>
+                        <div class="terminal-output" id="install-terminal-${serverId}"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
 
-        // Listen for WebSocket updates
-        if (this.socket) {
-            this.socket.on('installation_progress', (data) => {
-                if (data.server_id === serverId) {
-                    this.updateInstallationProgress(serverId, data);
-                }
-            });
+        // Show result immediately if available
+        if (result) {
+            if (result.success) {
+                this.addTerminalMessage(serverId, '[SUCCESS] Agent installed successfully!', 'success');
+                this.updateProgress(serverId, 100, 'Installation completed');
+            } else {
+                this.addTerminalMessage(serverId, `[ERROR] Installation failed: ${result.error}`, 'error');
+                this.updateProgress(serverId, 100, 'Installation failed');
+            }
+        }
+    }
+
+    addTerminalMessage(serverId, message, type = 'info') {
+        const terminal = document.getElementById(`install-terminal-${serverId}`);
+        if (terminal) {
+            const logLine = document.createElement('div');
+            logLine.className = `log-line ${type}`;
+            logLine.innerHTML = `<span class="timestamp">${new Date().toLocaleTimeString()}</span> ${message}`;
+            terminal.appendChild(logLine);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    }
+
+    updateProgress(serverId, progress, message) {
+        const progressBar = document.querySelector('.progress-fill');
+        const progressText = document.querySelector('.progress-text');
+
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${progress}% - ${message}`;
         }
     }
 
     updateInstallationProgress(serverId, data) {
-        const progressBar = document.querySelector('.progress-fill');
-        const progressText = document.querySelector('.progress-text');
-        const terminal = document.getElementById(`install-terminal-${serverId}`);
+        this.updateProgress(serverId, data.progress, data.message);
 
-        if (progressBar) {
-            progressBar.style.width = `${data.progress}%`;
-        }
-        
-        if (progressText) {
-            progressText.textContent = `${data.progress}% - ${data.message}`;
-        }
-
-        if (terminal && data.command_output) {
-            const logLine = document.createElement('div');
-            logLine.className = `log-line ${data.is_error ? 'error' : 'info'}`;
-            logLine.textContent = data.command_output;
-            terminal.appendChild(logLine);
-            terminal.scrollTop = terminal.scrollHeight;
+        if (data.command_output) {
+            this.addTerminalMessage(serverId, data.command_output, data.is_error ? 'error' : 'info');
         }
 
         if (data.progress === 100) {

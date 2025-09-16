@@ -119,16 +119,46 @@ def get_server_stats(server_id):
 @app.route('/api/servers/<server_id>/install-agent', methods=['POST'])
 @jwt_required()
 def install_agent_legacy(server_id):
-    """Install agent on server (legacy)"""
-    data = request.get_json()
-    result = server_manager.install_agent_remote(
-        host=data.get('host'),
-        port=data.get('port', 22),
-        username=data.get('username'),
-        password=data.get('password'),
-        key_file=data.get('key_file')
-    )
-    return jsonify(result)
+    """Install agent on server using real SSH installer"""
+    try:
+        # Получаем информацию о сервере
+        servers = load_servers()
+        server = next((s for s in servers if str(s['id']) == str(server_id)), None)
+        
+        if not server:
+            return jsonify({'success': False, 'error': 'Сервер не найден'}), 404
+        
+        # Настраиваем установщик
+        panel_address = request.host.split(':')[0] if request.host else 'localhost'
+        real_installer.panel_address = panel_address
+        real_installer.panel_port = 5000
+        
+        server_config = {
+            'host': server['host'],
+            'port': server.get('port', 22),
+            'username': server['username'],
+            'password': server.get('password'),
+            'key_file': server.get('key_file'),
+            'name': server['name']
+        }
+        
+        # Запускаем установку
+        result = real_installer.install_agent(server_config)
+        
+        if result['success']:
+            # Обновляем статус сервера
+            server['agent_installed'] = True
+            server['status'] = 'online'
+            save_servers(servers)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Ошибка установки агента: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Ошибка установки агента: {str(e)}'
+        }), 500
 
 @app.route('/api/servers/<server_id>/command', methods=['POST'])
 @jwt_required()

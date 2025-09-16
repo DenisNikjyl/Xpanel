@@ -344,51 +344,25 @@ class ServersManager {
         const progressFill = document.getElementById('install-progress-fill');
         const progressPercentage = document.getElementById('install-progress-percentage');
 
-        const steps = [
-            { text: 'Connecting to server...', delay: 1000 },
-            { text: 'Checking system requirements...', delay: 1500 },
-            { text: 'Downloading agent files...', delay: 2000 },
-            { text: 'Installing dependencies...', delay: 2500 },
-            { text: 'Configuring agent service...', delay: 1500 },
-            { text: 'Starting agent...', delay: 1000 },
-            { text: 'Verifying connection...', delay: 1500 }
-        ];
-
-        let currentStep = 0;
-        const totalSteps = steps.length;
-
-        for (const step of steps) {
-            this.addTerminalLine(`[INFO] ${step.text}`, 'info');
-            
-            // Update progress
-            const progress = Math.round(((currentStep + 1) / totalSteps) * 100);
-            if (progressFill) progressFill.style.width = `${progress}%`;
-            if (progressPercentage) progressPercentage.textContent = `${progress}%`;
-
-            await this.delay(step.delay);
-            currentStep++;
-        }
-
-        // Make actual API call
+        this.addTerminalLine(`[INFO] Starting agent installation on ${server.name}...`, 'info');
+        
+        // Make actual API call immediately - no fake simulation
         try {
             const response = await fetch(`/api/servers/${server.id}/install-agent`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.auth.getToken()}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    host: server.host,
-                    port: server.port,
-                    username: server.username,
-                    password: server.password,
-                    key_file: server.key_file
-                })
+                }
             });
 
             const result = await response.json();
 
             if (result.success) {
+                // Update progress to 100%
+                if (progressFill) progressFill.style.width = '100%';
+                if (progressPercentage) progressPercentage.textContent = '100%';
+                
                 this.addTerminalLine('[SUCCESS] Agent installed successfully!', 'success');
                 this.showNotification('Agent installed successfully', 'success');
                 
@@ -396,6 +370,10 @@ class ServersManager {
                 server.agent_status = 'installed';
                 this.renderServers();
             } else {
+                // Update progress to 100% (failed)
+                if (progressFill) progressFill.style.width = '100%';
+                if (progressPercentage) progressPercentage.textContent = '100%';
+                
                 this.addTerminalLine(`[ERROR] ${result.error}`, 'error');
                 this.showNotification('Agent installation failed', 'error');
             }
